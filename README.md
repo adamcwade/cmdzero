@@ -4,7 +4,7 @@ Tweak your UI live in the browser. Select any element, edit copy in place, nudge
 
 ## How it works
 
-- **`@tweaklocal/react`** — set `"jsxImportSource": "@tweaklocal/react"` and React's dev JSX runtime stamps every host element with `data-fui="<file>:<line>:<col>"`. Bundler-agnostic (Turbopack, webpack, Vite), server components included, zero production impact.
+- **`@tweaklocal/react`** — set `"jsxImportSource": "@tweaklocal/react"` and React's dev JSX runtime stamps every host element with `data-twk="<file>:<line>:<col>"`. Bundler-agnostic (Turbopack, webpack, Vite), server components included, zero production impact.
 - **`tweaklocal`** (CLI/daemon) — `npx tweaklocal` beside your dev server:
   - resolves a stamp to the exact AST node (element span, text literals, className) via `@babel/parser`
   - **copy edits** and **Tailwind class edits** are written straight to source — 0 tokens
@@ -31,7 +31,7 @@ Vite works the same way — pass `jsxImportSource: '@tweaklocal/react'` to `@vit
 
 - `packages/daemon` — the `tweaklocal` npm package (CLI, resolver, model router, overlay assets)
 - `packages/react` — `@tweaklocal/react` (dev JSX runtime stamping + `<TweakLocalOverlay />`)
-- `packages/babel-plugin-tweaklocal` — `@tweaklocal/babel-plugin` (build-time stamping alternative)
+- `packages/babel-plugin` — `@tweaklocal/babel-plugin` (build-time stamping alternative)
 - `packages/benchmark` — tokens/latency/cost harness ([results](packages/benchmark/results.md))
 - `apps/demo-next` — Next.js 15 test bed (server + client components)
 - `apps/demo` — Vite + React test bed
