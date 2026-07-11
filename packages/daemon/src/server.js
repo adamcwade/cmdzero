@@ -2,7 +2,7 @@ import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { describeTarget, applyTextEdit, applyClassEdit, parseLoc } from './resolver.js';
+import { describeTarget, applyTextEdit, applyClassEdit, parseLoc, checkSyntax } from './resolver.js';
 import { classify, buildPrompt, runClaude } from './router.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -100,6 +100,28 @@ export function startServer({ root, port = 4100 }) {
             cwd: root,
             onEvent: (e) => broadcast({ type: 'tweak', id, ...e }),
           });
+
+          // The model's edit must leave the file parseable: retry once with
+          // the parse error, then revert if it's still broken.
+          let parseErr = checkSyntax(root, file);
+          if (result.ok && parseErr) {
+            broadcast({ type: 'tweak', id, status: 'running', model: route.model, label: `${body.instruction.slice(0, 40)} (fixing syntax)` });
+            const retry = await runClaude({
+              prompt: `Your previous edit to ${file} left it with a JSX/JS syntax error:\n${parseErr}\n\nFix ${file} so it parses cleanly while preserving the intended change: ${body.instruction}\nEdit ONLY that file.`,
+              model: route.model,
+              cwd: root,
+            });
+            result.durationMs += retry.durationMs || 0;
+            if (retry.costUSD) result.costUSD = (result.costUSD || 0) + retry.costUSD;
+            parseErr = checkSyntax(root, file);
+          }
+          if (parseErr) {
+            const entry = undoStack.get(String(id));
+            fs.writeFileSync(entry.abs, entry.before);
+            result.ok = false;
+            result.error = `edit reverted — file was left unparseable: ${parseErr.slice(0, 120)}`;
+          }
+
           broadcast({
             type: 'tweak',
             id,

@@ -15,8 +15,9 @@ const FEATURES = [
 
 export default function Features() {
   return (
-    <section className="mx-auto max-w-5xl px-6 py-16">
-      <h2 className="text-center text-3xl font-bold">Everything you need</h2>
+    <>
+    <section className="mx-auto max-w-5xl px-6 py-16 p-1.5 text-xl">
+      <h2 className="text-center text-3xl font-bold">This is the edited text</h2>
       <div className="mt-10 grid gap-6 md:grid-cols-3">
         {FEATURES.map((f) => (
           <div key={f.title} className="rounded-xl border border-slate-800 bg-slate-900 p-6">
@@ -26,5 +27,13 @@ export default function Features() {
         ))}
       </div>
     </section>
+    <div className="mx-auto max-w-5xl px-6 py-8">
+      <img
+        src="https://source.unsplash.com/600x400/?unicorn"
+        alt="Unicorn"
+        className="w-full rounded-lg shadow-lg"
+      />
+    </div>
+    </>
   );
 }

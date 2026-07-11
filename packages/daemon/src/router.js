@@ -29,6 +29,7 @@ export function buildPrompt({ file, target, instruction }) {
     '```',
     `Instruction: ${instruction}`,
     'Rules: use Tailwind classes for styling, keep the change minimal and scoped to the selected element (and directly related code in the same file), do not reformat unrelated code, do not touch any other file.',
+    'The file must remain valid JSX after your edit — in particular, if you add a sibling element at the root of a component return, wrap the siblings in a fragment (<>...</>).',
   ].join('\n');
 }
 

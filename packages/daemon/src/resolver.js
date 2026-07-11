@@ -110,6 +110,17 @@ export function applyClassEdit(root, loc, removes = [], adds = []) {
   return writeChecked(abs, content, next);
 }
 
+/** Returns null if the file parses, else the parse error message. */
+export function checkSyntax(root, file) {
+  const abs = path.resolve(root, file);
+  try {
+    parseSource(fs.readFileSync(abs, 'utf8'), file);
+    return null;
+  } catch (e) {
+    return e.message;
+  }
+}
+
 function writeChecked(abs, before, after) {
   fs.writeFileSync(abs, after);
   return { abs, before, after };
