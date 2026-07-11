@@ -4,6 +4,7 @@
   "version": "0.0.1",
   "scripts": {
     "dev:demo": "pnpm --filter demo dev",
-    "dev:daemon": "pnpm --filter @fastui/daemon start"
+    "dev:next": "pnpm --filter demo-next dev",
+    "dev:daemon": "pnpm --filter fastui start"
   }
 }

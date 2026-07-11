@@ -1,11 +1,14 @@
 {
-  "name": "@fastui/daemon",
-  "version": "0.0.1",
+  "name": "fastui",
+  "version": "0.1.0",
+  "description": "Tweak your UI live in the browser and write the changes straight to source. Copy and Tailwind edits cost zero tokens; everything else routes to a right-sized model via headless claude.",
+  "license": "MIT",
   "type": "module",
   "bin": { "fastui": "bin/fastui.js" },
   "scripts": { "start": "node bin/fastui.js" },
+  "files": ["bin", "src", "overlay", "README.md"],
   "dependencies": {
     "@babel/parser": "^7.26.0"
   },
-  "license": "MIT"
+  "keywords": ["devtools", "tailwind", "visual-editor", "claude", "ai", "nextjs", "vite", "react"]
 }

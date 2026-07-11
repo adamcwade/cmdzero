@@ -1,0 +1,17 @@
+{
+  "name": "@fastui/react",
+  "version": "0.1.0",
+  "description": "Dev-time JSX source stamping for fastui — bundler-agnostic (Turbopack, webpack, Vite). Set jsxImportSource to \"@fastui/react\" and every rendered element knows its source file:line.",
+  "license": "MIT",
+  "main": "index.js",
+  "files": ["index.js", "jsx-runtime.js", "jsx-dev-runtime.js", "*.d.ts", "README.md"],
+  "exports": {
+    ".": "./index.js",
+    "./jsx-runtime": "./jsx-runtime.js",
+    "./jsx-dev-runtime": "./jsx-dev-runtime.js"
+  },
+  "peerDependencies": {
+    "react": ">=18"
+  },
+  "keywords": ["fastui", "jsx", "source-maps", "devtools", "nextjs"]
+}

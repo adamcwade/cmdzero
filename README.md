@@ -1,49 +1,63 @@
-# fastui (working name)
+# fastui
 
 Tweak your UI live in the browser. Select any element, edit copy in place, nudge styles, or describe a change — fastui knows exactly which source file and line each element came from, so most tweaks cost **zero tokens** and the rest run through a model sized to the job.
 
 ## How it works
 
-- **`@fastui/babel-plugin`** stamps every host JSX element with `data-fui="<file>:<line>:<col>"` in dev builds. Deterministic mapping — no AI guessing, works with server components.
-- **`@fastui/daemon`** (`node packages/daemon/bin/fastui.js`) runs beside your dev server:
+- **`@fastui/react`** — set `"jsxImportSource": "@fastui/react"` and React's dev JSX runtime stamps every host element with `data-fui="<file>:<line>:<col>"`. Bundler-agnostic (Turbopack, webpack, Vite), server components included, zero production impact.
+- **`fastui`** (CLI/daemon) — `npx fastui` beside your dev server:
   - resolves a stamp to the exact AST node (element span, text literals, className) via `@babel/parser`
   - **copy edits** and **Tailwind class edits** are written straight to source — 0 tokens
-  - **natural-language tweaks** are classified (style/copy → `haiku`, functionality → `sonnet`, override with `FASTUI_FAST_MODEL` / `FASTUI_SMART_MODEL`) and executed by spawning headless `claude -p` scoped to the one mapped file
-  - per-tweak undo, SSE status events
-- **Overlay** (served by the daemon, injected by Vite in dev): `⌘.` toggles select mode → hover badges → click to select → popover with copy/style/NL controls → tweak tray with model, duration, cost, and undo.
+  - **natural-language tweaks** are classified (style/copy → `haiku`, functionality → `sonnet`) and executed by spawning headless `claude -p` scoped to the one mapped file, with post-edit JSX validation, one retry, and auto-revert
+  - per-tweak undo, SSE status events, persistent savings ledger (`.fastui/savings.json`)
+- **Overlay** (served by the daemon): `⌘.` select mode → hover badges → green-bordered popover with copy editing, per-side padding/margin, font sizes and color swatches read from *your* design-system tokens, radius/shadow chips, NL input → tweak tray with model, cost, and estimated savings.
+- **`@fastui/babel-plugin`** — alternative build-time stamping for setups where changing `jsxImportSource` isn't an option.
 
-## Run the demo
+## Add to your Next.js app
+
+```sh
+npm i -D fastui @fastui/react
+```
+
+1. `jsconfig.json` / `tsconfig.json` → `{ "compilerOptions": { "jsxImportSource": "@fastui/react" } }`
+2. Root layout → `import { FastUIOverlay } from '@fastui/react'` and render `<FastUIOverlay />` at the end of `<body>`
+3. `npx fastui` from the project root, then open your app and press `⌘.`
+
+(Pre-publish, install from tarballs: `npm i -D ./dist-packages/fastui-0.1.0.tgz ./dist-packages/fastui-react-0.1.0.tgz`)
+
+Vite works the same way — pass `jsxImportSource: '@fastui/react'` to `@vitejs/plugin-react` (or use `@fastui/babel-plugin` as in [apps/demo/vite.config.js](apps/demo/vite.config.js)).
+
+## Repo layout
+
+- `packages/daemon` — the `fastui` npm package (CLI, resolver, model router, overlay assets)
+- `packages/react` — `@fastui/react` (dev JSX runtime stamping + `<FastUIOverlay />`)
+- `packages/babel-plugin-fastui` — `@fastui/babel-plugin` (build-time stamping alternative)
+- `packages/benchmark` — tokens/latency/cost harness ([results](packages/benchmark/results.md))
+- `apps/demo-next` — Next.js 15 test bed (server + client components)
+- `apps/demo` — Vite + React test bed
+- `dist-packages/` — `npm pack` tarballs
+
+## Run the demos
 
 ```sh
 pnpm install
-cd apps/demo && node ../../packages/daemon/bin/fastui.js &   # daemon on :4100
-pnpm --filter demo dev                                        # vite on :5173
+pnpm dev:daemon      # daemon on :4100 (run from the app dir you're editing)
+pnpm dev:next        # Next demo on :3001
+pnpm dev:demo        # Vite demo on :5173
 ```
 
-Open http://localhost:5173, press `⌘.`, click anything.
+## Benchmark (demo repo, 4 edits, all correct)
 
-## Use it in your own project (pre-npm)
-
-Requirements: Vite + React (jsx/tsx), Tailwind for the style lanes, `claude` CLI for NL tweaks.
-
-1. Add the plugin from this repo:
-   ```sh
-   pnpm add -D file:/path/to/fast-ui-updates/packages/babel-plugin-fastui
-   ```
-2. In `vite.config.js`, mirror the demo config ([apps/demo/vite.config.js](apps/demo/vite.config.js)): pass the babel plugin to `react()` in dev, and add the `fastui-overlay-inject` snippet that injects `http://localhost:4100/overlay.js`.
-3. Run the daemon from your project root (so file paths resolve):
-   ```sh
-   cd your-project && node /path/to/fast-ui-updates/packages/daemon/bin/fastui.js
-   ```
-
-Estimated savings accumulate in `.fastui/savings.json` (gitignore it).
-
-## Layout
-
-- `packages/babel-plugin-fastui` — source stamping
-- `packages/daemon` — resolver, model router, HTTP/SSE server, overlay assets
-- `apps/demo` — Vite + React + Tailwind test bed
+| | Baseline unscoped agent | fastui |
+|---|---|---|
+| Copy/style tweaks | ~19s · ~137k tok · ~$0.10 each | **ms · 0 tok · $0** |
+| NL style tweak | 16.3s · $0.084 (sonnet) | 16.0s · **$0.032 (haiku)** |
+| Total (4 edits) | 72s · 495k tok · $0.375 | 34s · 196k tok · **$0.118** |
 
 ## Roadmap
 
-- Next.js adapter (Turbopack-compatible stamping), attached-agent mode via MCP, blast-radius scope prompt (instance vs shared component), CSS-modules/styled-components attribution, git-checkpoint undo, benchmark harness (tokens/latency vs vanilla agent edits).
+- Publish to npm (`fastui`, `@fastui/react` — names verified available)
+- Real-repo benchmark (~500-file app) for launch
+- Diff-based per-tweak undo (current undo restores whole-file snapshots)
+- Blast-radius scope prompt (instance vs shared component vs token)
+- Attached-agent mode via MCP; landing page + pricing

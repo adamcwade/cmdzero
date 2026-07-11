@@ -101,13 +101,16 @@
       const m = /^([\d.]+)(px|rem|em)?$/.exec(v);
       return m ? parseFloat(m[1]) * (m[2] === 'px' ? 1 : 16) : NaN;
     };
-    let textSizes = Object.keys(vars)
-      .filter((k) => /^--text-[a-z0-9]+$/.test(k))
-      .map((k) => ({ cls: 'text-' + k.slice(7), px: px(vars[k]) }))
-      .filter((t) => !isNaN(t.px))
-      .sort((a, b) => a.px - b.px)
-      .map((t) => t.cls);
-    if (textSizes.length < 3) textSizes = FONT_FALLBACK;
+    // Design-system sizes first, merged with the canonical Tailwind scale so
+    // stepping never dead-ends when the app only uses a few sizes.
+    const CANON_PX = { 'text-xs': 12, 'text-sm': 14, 'text-base': 16, 'text-lg': 18, 'text-xl': 20, 'text-2xl': 24, 'text-3xl': 30, 'text-4xl': 36, 'text-5xl': 48, 'text-6xl': 60, 'text-7xl': 72 };
+    const sizeMap = new Map(Object.entries(CANON_PX));
+    for (const k of Object.keys(vars)) {
+      if (!/^--text-[a-z0-9]+$/.test(k)) continue;
+      const v = px(vars[k]);
+      if (!isNaN(v)) sizeMap.set('text-' + k.slice(7), v);
+    }
+    const textSizes = [...sizeMap.entries()].sort((a, b) => a[1] - b[1]).map(([cls]) => cls);
     const colors = Object.keys(vars)
       .filter((k) => /^--color-[a-z0-9-]+$/.test(k))
       .map((k) => ({ name: k.slice(8), value: vars[k] }))

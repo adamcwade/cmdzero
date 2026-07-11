@@ -26,21 +26,28 @@ export function parseLoc(loc) {
 }
 
 export function loadTarget(root, loc) {
-  const { file, line, col } = parseLoc(loc);
+  const parsed = parseLoc(loc);
+  const { line, col } = parsed;
+  // Stamps come from two sources: the babel plugin (root-relative path,
+  // 0-based column) and the @fastui/react dev runtime (absolute path,
+  // 1-based column). Normalize the path and match either column convention.
+  const file = path.isAbsolute(parsed.file)
+    ? path.relative(root, parsed.file)
+    : parsed.file;
+  if (file.startsWith('..')) throw new Error('file outside root');
   const abs = path.resolve(root, file);
-  if (!abs.startsWith(path.resolve(root))) throw new Error('file outside root');
   const content = fs.readFileSync(abs, 'utf8');
   const ast = parseSource(content, file);
   let element = null;
+  let nearMiss = null;
   walk(ast, (n) => {
-    if (
-      n.type === 'JSXElement' &&
-      n.openingElement.loc &&
-      n.openingElement.loc.start.line === line &&
-      n.openingElement.loc.start.column === col
-    )
-      element = n;
+    if (n.type !== 'JSXElement' || !n.openingElement.loc) return;
+    const s = n.openingElement.loc.start;
+    if (s.line !== line) return;
+    if (s.column === col) element = n;
+    else if (s.column === col - 1 && !nearMiss) nearMiss = n;
   });
+  element = element || nearMiss;
   if (!element) throw new Error(`no JSX element at ${loc}`);
   return { file, abs, content, element };
 }
