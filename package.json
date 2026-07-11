@@ -1,0 +1,9 @@
+{
+  "name": "fastui-workspace",
+  "private": true,
+  "version": "0.0.1",
+  "scripts": {
+    "dev:demo": "pnpm --filter demo dev",
+    "dev:daemon": "pnpm --filter @fastui/daemon start"
+  }
+}
