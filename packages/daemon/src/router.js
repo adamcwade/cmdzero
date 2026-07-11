@@ -7,15 +7,15 @@ const FUNCTIONALITY = /(click|toggle|open|close|submit|fetch|load|save|state|cou
 /**
  * Route a natural-language tweak to a model tier.
  * Style/copy → fast model, functionality → reasoning model.
- * Overridable via FASTUI_FAST_MODEL / FASTUI_SMART_MODEL.
+ * Overridable via TWEAKLOCAL_FAST_MODEL / TWEAKLOCAL_SMART_MODEL.
  */
 export function classify(instruction) {
   const isFunc = FUNCTIONALITY.test(instruction);
   return {
     kind: isFunc ? 'functionality' : 'style/copy',
     model: isFunc
-      ? process.env.FASTUI_SMART_MODEL || 'sonnet'
-      : process.env.FASTUI_FAST_MODEL || 'haiku',
+      ? process.env.TWEAKLOCAL_SMART_MODEL || 'sonnet'
+      : process.env.TWEAKLOCAL_FAST_MODEL || 'haiku',
   };
 }
 

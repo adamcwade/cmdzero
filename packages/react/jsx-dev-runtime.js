@@ -1,7 +1,7 @@
 // Development JSX runtime that stamps host elements with their source
 // location. The compiler (SWC, Babel, esbuild — any bundler) already passes
 // {fileName, lineNumber, columnNumber} to jsxDEV in dev builds; we just copy
-// it onto the DOM as data-fui so the fastui overlay/daemon can map any
+// it onto the DOM as data-twk so the TweakLocal overlay/daemon can map any
 // rendered element back to its exact JSX expression. Server components
 // included — the attribute serializes to HTML like any other.
 'use strict';
@@ -16,10 +16,10 @@ exports.jsxDEV = function jsxDEV(type, props, key, isStaticChildren, source, sel
     source &&
     source.fileName &&
     !source.fileName.includes('node_modules') &&
-    (!props || props['data-fui'] === undefined)
+    (!props || props['data-twk'] === undefined)
   ) {
     props = Object.assign({}, props, {
-      'data-fui': `${source.fileName}:${source.lineNumber}:${source.columnNumber ?? 0}`,
+      'data-twk': `${source.fileName}:${source.lineNumber}:${source.columnNumber ?? 0}`,
     });
   }
   return ReactJSXDev.jsxDEV(type, props, key, isStaticChildren, source, self);

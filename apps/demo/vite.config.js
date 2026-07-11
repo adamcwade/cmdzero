@@ -5,15 +5,15 @@ import tailwindcss from '@tailwindcss/vite';
 export default defineConfig(({ command }) => ({
   plugins: [
     react({
-      // fastui stamping is dev-only: production builds skip Babel entirely.
+      // TweakLocal stamping is dev-only: production builds skip Babel entirely.
       babel:
         command === 'serve'
-          ? { plugins: [['@fastui/babel-plugin', { root: process.cwd() }]] }
+          ? { plugins: [['@tweaklocal/babel-plugin', { root: process.cwd() }]] }
           : undefined,
     }),
     tailwindcss(),
     {
-      name: 'fastui-overlay-inject',
+      name: 'tweaklocal-overlay-inject',
       apply: 'serve',
       transformIndexHtml(html) {
         return {

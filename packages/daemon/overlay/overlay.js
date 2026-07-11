@@ -1,49 +1,49 @@
-// fastui overlay — injected into the app in dev. Vanilla JS, no deps.
+// TweakLocal overlay — injected into the app in dev. Vanilla JS, no deps.
 (() => {
-  if (window.__FASTUI__) return;
-  window.__FASTUI__ = true;
+  if (window.__TWEAKLOCAL__) return;
+  window.__TWEAKLOCAL__ = true;
 
   const script = [...document.scripts].find((s) => /\/overlay\.js/.test(s.src));
-  const ORIGIN = window.FASTUI_ORIGIN || (script ? new URL(script.src).origin : 'http://localhost:4100');
+  const ORIGIN = window.TWEAKLOCAL_ORIGIN || (script ? new URL(script.src).origin : 'http://localhost:4100');
 
   const SPACE_SCALE = ['0', '0.5', '1', '1.5', '2', '2.5', '3', '3.5', '4', '5', '6', '7', '8', '9', '10', '11', '12', '14', '16', '20', '24'];
   const FONT_FALLBACK = ['text-xs', 'text-sm', 'text-base', 'text-lg', 'text-xl', 'text-2xl', 'text-3xl', 'text-4xl', 'text-5xl', 'text-6xl', 'text-7xl'];
 
   const css = `
-  #fui-root{position:fixed;inset:0;pointer-events:none;z-index:2147483000;font-family:ui-sans-serif,system-ui,sans-serif}
-  .fui-outline{position:fixed;border:1.5px solid #6366f1;border-radius:3px;background:rgba(99,102,241,.08);pointer-events:none;transition:all .04s linear}
-  .fui-outline.fui-selected{border-color:#10b981;background:rgba(16,185,129,.06)}
-  .fui-badge{position:fixed;background:#312e81;color:#e0e7ff;font-size:11px;padding:2px 7px;border-radius:4px;pointer-events:none;white-space:nowrap;transform:translateY(-100%)}
-  .fui-pop{position:fixed;background:#111827;color:#f9fafb;border:1.5px solid #10b981;border-radius:10px;box-shadow:0 8px 30px rgba(0,0,0,.35);padding:8px;pointer-events:auto;display:flex;flex-direction:column;gap:6px;min-width:300px;max-width:340px;font-size:12px}
-  .fui-row{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
-  .fui-pop button{background:#374151;color:#f9fafb;border:none;border-radius:6px;padding:4px 9px;font-size:12px;cursor:pointer}
-  .fui-pop button:hover{background:#4b5563}
-  .fui-pop button.fui-primary{background:#6366f1}
-  .fui-pop input{flex:1;background:#1f2937;border:1px solid #374151;border-radius:6px;color:#f9fafb;padding:5px 8px;font-size:12px;outline:none}
-  .fui-pop select{background:#1f2937;border:1px solid #374151;border-radius:6px;color:#f9fafb;padding:3px 4px;font-size:11.5px;outline:none}
-  .fui-label{color:#9ca3af;min-width:50px}
-  .fui-cur{color:#6ee7b7;font-size:11px;margin-left:auto}
-  .fui-swatches{display:flex;gap:4px;flex-wrap:wrap;max-height:96px;overflow-y:auto;padding:2px}
-  .fui-swatch{width:18px;height:18px;border-radius:4px;border:1px solid rgba(255,255,255,.25);cursor:pointer;padding:0}
-  .fui-swatch:hover{transform:scale(1.15)}
-  .fui-chip{font-size:10.5px !important;padding:2px 6px !important}
-  .fui-tray{position:fixed;right:14px;bottom:14px;display:flex;flex-direction:column;gap:6px;pointer-events:auto;max-width:360px}
-  .fui-total{background:#064e3b;color:#a7f3d0;border-radius:8px;padding:5px 10px;font-size:11.5px;box-shadow:0 4px 14px rgba(0,0,0,.3)}
-  .fui-tweak{background:#111827;color:#e5e7eb;border-radius:8px;padding:6px 10px;font-size:11.5px;display:flex;gap:8px;align-items:center;box-shadow:0 4px 14px rgba(0,0,0,.3)}
-  .fui-dot{width:8px;height:8px;border-radius:50%;flex:none}
-  .fui-dot.done{background:#10b981}.fui-dot.queued,.fui-dot.running{background:#f59e0b;animation:fui-pulse 1s infinite}.fui-dot.error{background:#ef4444}.fui-dot.reverted{background:#6b7280}
-  .fui-tweak button{background:none;border:none;color:#818cf8;cursor:pointer;font-size:11px;padding:0}
-  .fui-meta{color:#9ca3af}
-  .fui-hint{position:fixed;left:14px;bottom:14px;background:#111827;color:#9ca3af;font-size:11px;padding:5px 10px;border-radius:6px;pointer-events:none}
+  #twk-root{position:fixed;inset:0;pointer-events:none;z-index:2147483000;font-family:ui-sans-serif,system-ui,sans-serif}
+  .twk-outline{position:fixed;border:1.5px solid #6366f1;border-radius:3px;background:rgba(99,102,241,.08);pointer-events:none;transition:all .04s linear}
+  .twk-outline.twk-selected{border-color:#10b981;background:rgba(16,185,129,.06)}
+  .twk-badge{position:fixed;background:#312e81;color:#e0e7ff;font-size:11px;padding:2px 7px;border-radius:4px;pointer-events:none;white-space:nowrap;transform:translateY(-100%)}
+  .twk-pop{position:fixed;background:#111827;color:#f9fafb;border:1.5px solid #10b981;border-radius:10px;box-shadow:0 8px 30px rgba(0,0,0,.35);padding:8px;pointer-events:auto;display:flex;flex-direction:column;gap:6px;min-width:300px;max-width:340px;font-size:12px}
+  .twk-row{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+  .twk-pop button{background:#374151;color:#f9fafb;border:none;border-radius:6px;padding:4px 9px;font-size:12px;cursor:pointer}
+  .twk-pop button:hover{background:#4b5563}
+  .twk-pop button.twk-primary{background:#6366f1}
+  .twk-pop input{flex:1;background:#1f2937;border:1px solid #374151;border-radius:6px;color:#f9fafb;padding:5px 8px;font-size:12px;outline:none}
+  .twk-pop select{background:#1f2937;border:1px solid #374151;border-radius:6px;color:#f9fafb;padding:3px 4px;font-size:11.5px;outline:none}
+  .twk-label{color:#9ca3af;min-width:50px}
+  .twk-cur{color:#6ee7b7;font-size:11px;margin-left:auto}
+  .twk-swatches{display:flex;gap:4px;flex-wrap:wrap;max-height:96px;overflow-y:auto;padding:2px}
+  .twk-swatch{width:18px;height:18px;border-radius:4px;border:1px solid rgba(255,255,255,.25);cursor:pointer;padding:0}
+  .twk-swatch:hover{transform:scale(1.15)}
+  .twk-chip{font-size:10.5px !important;padding:2px 6px !important}
+  .twk-tray{position:fixed;right:14px;bottom:14px;display:flex;flex-direction:column;gap:6px;pointer-events:auto;max-width:360px}
+  .twk-total{background:#064e3b;color:#a7f3d0;border-radius:8px;padding:5px 10px;font-size:11.5px;box-shadow:0 4px 14px rgba(0,0,0,.3)}
+  .twk-tweak{background:#111827;color:#e5e7eb;border-radius:8px;padding:6px 10px;font-size:11.5px;display:flex;gap:8px;align-items:center;box-shadow:0 4px 14px rgba(0,0,0,.3)}
+  .twk-dot{width:8px;height:8px;border-radius:50%;flex:none}
+  .twk-dot.done{background:#10b981}.twk-dot.queued,.twk-dot.running{background:#f59e0b;animation:twk-pulse 1s infinite}.twk-dot.error{background:#ef4444}.twk-dot.reverted{background:#6b7280}
+  .twk-tweak button{background:none;border:none;color:#818cf8;cursor:pointer;font-size:11px;padding:0}
+  .twk-meta{color:#9ca3af}
+  .twk-hint{position:fixed;left:14px;bottom:14px;background:#111827;color:#9ca3af;font-size:11px;padding:5px 10px;border-radius:6px;pointer-events:none}
   [contenteditable="plaintext-only"],[contenteditable="true"]{outline:2px dashed #10b981;outline-offset:2px}
-  @keyframes fui-pulse{50%{opacity:.4}}`;
+  @keyframes twk-pulse{50%{opacity:.4}}`;
 
   const style = document.createElement('style');
   style.textContent = css;
   document.head.appendChild(style);
 
   const root = document.createElement('div');
-  root.id = 'fui-root';
+  root.id = 'twk-root';
   document.body.appendChild(root);
 
   const state = {
@@ -120,8 +120,8 @@
   }
 
   // ---------- hover ----------
-  const hoverBox = el('div', 'fui-outline');
-  const hoverBadge = el('div', 'fui-badge');
+  const hoverBox = el('div', 'twk-outline');
+  const hoverBadge = el('div', 'twk-badge');
   hoverBox.style.display = hoverBadge.style.display = 'none';
   root.append(hoverBox, hoverBadge);
 
@@ -133,21 +133,21 @@
     }
     hoverBox.style.display = hoverBadge.style.display = 'block';
     const r = positionBox(hoverBox, target);
-    hoverBadge.textContent = `<${target.tagName.toLowerCase()}> ${target.getAttribute('data-fui')}`;
+    hoverBadge.textContent = `<${target.tagName.toLowerCase()}> ${target.getAttribute('data-twk')}`;
     Object.assign(hoverBadge.style, { left: r.left + 'px', top: Math.max(r.top - 4, 16) + 'px' });
   }
 
   // ---------- selection ----------
-  const selBox = el('div', 'fui-outline fui-selected');
+  const selBox = el('div', 'twk-outline twk-selected');
   selBox.style.display = 'none';
   root.appendChild(selBox);
-  const pop = el('div', 'fui-pop');
+  const pop = el('div', 'twk-pop');
   pop.style.display = 'none';
   root.appendChild(pop);
 
   function select(target) {
     finishTextEdit(false);
-    const loc = target.getAttribute('data-fui');
+    const loc = target.getAttribute('data-twk');
     state.selected = { el: target, loc };
     selBox.style.display = 'block';
     renderPopover();
@@ -166,7 +166,7 @@
     if (!s) return;
     if (!document.contains(s.el)) {
       // HMR replaced the node — re-acquire by stamp
-      const again = document.querySelector(`[data-fui="${CSS.escape(s.loc)}"]`);
+      const again = document.querySelector(`[data-twk="${CSS.escape(s.loc)}"]`);
       if (!again) return deselect();
       s.el = again;
     }
@@ -251,8 +251,8 @@
 
   function spacingRow(label, base) {
     const s = state.selected;
-    const row = el('div', 'fui-row');
-    row.append(el('span', 'fui-label', label));
+    const row = el('div', 'twk-row');
+    row.append(el('span', 'twk-label', label));
     const sideSel = el('select');
     for (const [name, v] of [['All', ''], ['Top', 't'], ['Right', 'r'], ['Bottom', 'b'], ['Left', 'l']]) {
       const o = el('option', null, name);
@@ -265,7 +265,7 @@
     plus.onclick = () => applyClassTweak(spacingStep(s.el, base, sideSel.value, +1), label);
     row.append(sideSel, minus, plus);
     const cur = classList(s.el).filter((c) => new RegExp(`^${base}[trbl]?-`).test(c)).join(' ');
-    if (cur) row.append(el('span', 'fui-cur', cur));
+    if (cur) row.append(el('span', 'twk-cur', cur));
     return row;
   }
 
@@ -274,13 +274,13 @@
     if (!s) return;
     pop.textContent = '';
 
-    const head = el('div', 'fui-row');
-    head.append(el('span', 'fui-meta', s.loc));
+    const head = el('div', 'twk-row');
+    head.append(el('span', 'twk-meta', s.loc));
     pop.appendChild(head);
 
     if (hasEditableText(s.el)) {
-      const row = el('div', 'fui-row');
-      row.append(el('span', 'fui-label', 'Copy'));
+      const row = el('div', 'twk-row');
+      row.append(el('span', 'twk-label', 'Copy'));
       const b = el('button', null, '✎ Edit text in place');
       b.onclick = () => startTextEdit();
       row.appendChild(b);
@@ -290,20 +290,20 @@
     pop.appendChild(spacingRow('Padding', 'p'));
     pop.appendChild(spacingRow('Margin', 'm'));
 
-    const fontRow = el('div', 'fui-row');
-    fontRow.append(el('span', 'fui-label', 'Font'));
+    const fontRow = el('div', 'twk-row');
+    fontRow.append(el('span', 'twk-label', 'Font'));
     const fMinus = el('button', null, 'A−');
     const fPlus = el('button', null, 'A+');
     fMinus.onclick = () => applyClassTweak(fontStep(s.el, -1), 'font');
     fPlus.onclick = () => applyClassTweak(fontStep(s.el, +1), 'font');
     fontRow.append(fMinus, fPlus);
     const curFont = classList(s.el).find((c) => readTheme().textSizes.includes(c));
-    fontRow.append(el('span', 'fui-cur', curFont || 'inherited'));
+    fontRow.append(el('span', 'twk-cur', curFont || 'inherited'));
     pop.appendChild(fontRow);
 
     // property editor
-    const propRow = el('div', 'fui-row');
-    propRow.append(el('span', 'fui-label', 'Style'));
+    const propRow = el('div', 'twk-row');
+    propRow.append(el('span', 'twk-label', 'Style'));
     const propSel = el('select');
     propSel.appendChild(el('option', null, 'Choose property…'));
     for (const name of Object.keys(PROPS)) {
@@ -313,7 +313,7 @@
     }
     propRow.appendChild(propSel);
     pop.appendChild(propRow);
-    const swatches = el('div', 'fui-swatches');
+    const swatches = el('div', 'twk-swatches');
     pop.appendChild(swatches);
     propSel.onchange = () => {
       swatches.textContent = '';
@@ -322,11 +322,11 @@
       if (p.type === 'color') {
         const { colors, fromDS } = readTheme();
         if (!fromDS) {
-          swatches.append(el('span', 'fui-meta', 'no design-system colors found in page CSS'));
+          swatches.append(el('span', 'twk-meta', 'no design-system colors found in page CSS'));
           return;
         }
         for (const c of colors) {
-          const b = el('button', 'fui-swatch');
+          const b = el('button', 'twk-swatch');
           b.style.background = c.value;
           b.title = `${p.prefix}-${c.name}`;
           b.onclick = () => applyClassTweak(propChange(s.el, propSel.value, `${p.prefix}-${c.name}`), propSel.value);
@@ -334,7 +334,7 @@
         }
       } else {
         for (const opt of p.options) {
-          const b = el('button', 'fui-chip', opt);
+          const b = el('button', 'twk-chip', opt);
           b.onclick = () => applyClassTweak(propChange(s.el, propSel.value, opt), propSel.value);
           swatches.appendChild(b);
         }
@@ -342,10 +342,10 @@
       reposition();
     };
 
-    const nlRow = el('div', 'fui-row');
+    const nlRow = el('div', 'twk-row');
     const input = el('input');
     input.placeholder = 'Describe a change… (routed to the right model)';
-    const go = el('button', 'fui-primary', 'Go');
+    const go = el('button', 'twk-primary', 'Go');
     const send = async () => {
       const instruction = input.value.trim();
       if (!instruction) return;
@@ -393,9 +393,9 @@
   }
 
   // ---------- tray ----------
-  const tray = el('div', 'fui-tray');
+  const tray = el('div', 'twk-tray');
   root.appendChild(tray);
-  const totalBar = el('div', 'fui-total');
+  const totalBar = el('div', 'twk-total');
   totalBar.style.display = 'none';
   tray.appendChild(totalBar);
   const tweaks = new Map();
@@ -409,10 +409,10 @@
   function addTweak(t) {
     let row = tweaks.get(String(t.id));
     if (!row) {
-      row = el('div', 'fui-tweak');
-      row._dot = el('span', 'fui-dot');
+      row = el('div', 'twk-tweak');
+      row._dot = el('span', 'twk-dot');
       row._label = el('span', null, '');
-      row._meta = el('span', 'fui-meta', '');
+      row._meta = el('span', 'twk-meta', '');
       row._undo = el('button', null, 'undo');
       row._undo.style.display = 'none';
       row._undo.onclick = async () => {
@@ -428,7 +428,7 @@
     }
     if (t.label) row._label.textContent = t.label;
     if (t.status) {
-      row._dot.className = 'fui-dot ' + t.status;
+      row._dot.className = 'twk-dot ' + t.status;
       row._undo.style.display = t.status === 'done' && !String(t.id).startsWith('x') ? '' : 'none';
     }
     const bits = [];
@@ -453,7 +453,7 @@
   fetch(`${ORIGIN}/api/health`).then((r) => r.json()).then((h) => showTotals(h.totals)).catch(() => {});
 
   // ---------- mode + events ----------
-  const hint = el('div', 'fui-hint', '⌘. select mode');
+  const hint = el('div', 'twk-hint', '⌘. select mode');
   root.appendChild(hint);
 
   function setMode(on) {
@@ -483,7 +483,7 @@
   addEventListener('mousemove', (e) => {
     if (!state.selectMode || state.editing) return;
     if (inOverlay(e.target)) return setHover(null);
-    setHover(e.target instanceof Element ? e.target.closest('[data-fui]') : null);
+    setHover(e.target instanceof Element ? e.target.closest('[data-twk]') : null);
   }, true);
 
   addEventListener('click', (e) => {
@@ -492,7 +492,7 @@
     if (state.editing) return; // clicks inside editable text are fine
     e.preventDefault();
     e.stopPropagation();
-    const target = e.target instanceof Element ? e.target.closest('[data-fui]') : null;
+    const target = e.target instanceof Element ? e.target.closest('[data-twk]') : null;
     if (target) select(target);
     else deselect();
   }, true);

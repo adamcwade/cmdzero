@@ -1,4 +1,4 @@
-# fastui
+# TweakLocal
 
 Tweak your UI live in the browser — the changes are written straight to your source files.
 
@@ -9,21 +9,21 @@ Tweak your UI live in the browser — the changes are written straight to your s
 ## Quickstart (Next.js)
 
 ```sh
-npm i -D fastui @fastui/react
+npm i -D tweaklocal @tweaklocal/react
 ```
 
 1. `jsconfig.json` / `tsconfig.json`:
    ```json
-   { "compilerOptions": { "jsxImportSource": "@fastui/react" } }
+   { "compilerOptions": { "jsxImportSource": "@tweaklocal/react" } }
    ```
 2. Root layout:
    ```jsx
-   import { FastUIOverlay } from '@fastui/react';
-   // inside <body>: {children}<FastUIOverlay />
+   import { TweakLocalOverlay } from '@tweaklocal/react';
+   // inside <body>: {children}<TweakLocalOverlay />
    ```
 3. Run the daemon next to your dev server, from the project root:
    ```sh
-   npx fastui
+   npx tweaklocal
    ```
 4. Open your app, press `⌘.`, click anything.
 
@@ -31,7 +31,7 @@ Works with Turbopack, webpack, and Vite — stamping happens in React's dev JSX 
 
 ## Options
 
-- `npx fastui --port 4101` (+ `<FastUIOverlay origin="http://localhost:4101" />`)
-- `FASTUI_FAST_MODEL` / `FASTUI_SMART_MODEL` — model aliases for the router (default `haiku` / `sonnet`)
-- `FASTUI_BASELINE_COST` / `FASTUI_BASELINE_MS` — baseline for the savings counter
+- `npx tweaklocal --port 4101` (+ `<TweakLocalOverlay origin="http://localhost:4101" />`)
+- `TWEAKLOCAL_FAST_MODEL` / `TWEAKLOCAL_SMART_MODEL` — model aliases for the router (default `haiku` / `sonnet`)
+- `TWEAKLOCAL_BASELINE_COST` / `TWEAKLOCAL_BASELINE_MS` — baseline for the savings counter
 - Natural-language tweaks require the [Claude Code CLI](https://claude.com/claude-code) (`claude`) on your PATH; copy/style lanes work without it.

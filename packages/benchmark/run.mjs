@@ -1,4 +1,4 @@
-// fastui benchmark: same edits, (a) vanilla repo-wide agent vs (b) fastui lane.
+// tweaklocal benchmark: same edits, (a) vanilla repo-wide agent vs (b) tweaklocal lane.
 // Usage: node packages/benchmark/run.mjs   (from repo root)
 import { spawn } from 'node:child_process';
 import { execSync } from 'node:child_process';
@@ -9,7 +9,7 @@ import { classify, buildPrompt } from '../daemon/src/router.js';
 
 const ROOT = path.resolve(import.meta.dirname, '../..');
 const APP = path.join(ROOT, 'apps/demo');
-const BASELINE_MODEL = process.env.FASTUI_BENCH_BASELINE_MODEL || 'sonnet';
+const BASELINE_MODEL = process.env.TWEAKLOCAL_BENCH_BASELINE_MODEL || 'sonnet';
 
 const TASKS = [
   {
@@ -108,7 +108,7 @@ for (const task of TASKS) {
   console.log(`    ${base.wallMs}ms, ${base.tokens ?? '?'} tokens, $${base.costUSD?.toFixed(3) ?? '?'}, pass=${base.pass}`);
   resetApp();
 
-  // --- fastui lane
+  // --- tweaklocal lane
   let fui;
   if (task.lane === 'zero-token') {
     const t0 = Date.now();
@@ -118,7 +118,7 @@ for (const task of TASKS) {
     const route = classify(task.instruction);
     const target = describeTarget(APP, task.loc);
     const prompt = buildPrompt({ file: target.file, target, instruction: task.instruction });
-    console.log(`  fastui (${route.model}, scoped to ${target.file})…`);
+    console.log(`  tweaklocal (${route.model}, scoped to ${target.file})…`);
     fui = await runClaude({ prompt, model: route.model, tools: 'Read,Edit' });
     fui.model = route.model;
   }
@@ -126,26 +126,26 @@ for (const task of TASKS) {
   console.log(`    ${fui.wallMs}ms, ${fui.tokens ?? '?'} tokens, $${fui.costUSD?.toFixed(3) ?? '?'}, pass=${fui.pass}`);
   resetApp();
 
-  results.push({ task: task.name, baseline: base, fastui: fui });
+  results.push({ task: task.name, baseline: base, tweaklocal: fui });
 }
 
 // --- report
 const fmt = (r) =>
   `${r.pass ? '✅' : '❌'} ${(r.wallMs / 1000).toFixed(1)}s · ${r.tokens ?? '?'} tok · $${r.costUSD?.toFixed(3) ?? '?'}`;
-let md = `# fastui benchmark\n\nBaseline: unscoped \`claude -p --model ${BASELINE_MODEL}\` with Read/Edit/Glob/Grep in \`apps/demo\` (agent must locate the code). fastui: zero-token deterministic lane, or scoped prompt + routed model with Read/Edit only.\n\n| Task | Baseline | fastui | Token reduction |\n|---|---|---|---|\n`;
+let md = `# tweaklocal benchmark\n\nBaseline: unscoped \`claude -p --model ${BASELINE_MODEL}\` with Read/Edit/Glob/Grep in \`apps/demo\` (agent must locate the code). tweaklocal: zero-token deterministic lane, or scoped prompt + routed model with Read/Edit only.\n\n| Task | Baseline | tweaklocal | Token reduction |\n|---|---|---|---|\n`;
 for (const r of results) {
   const red =
-    r.baseline.tokens && r.fastui.tokens != null
-      ? r.fastui.tokens === 0
+    r.baseline.tokens && r.tweaklocal.tokens != null
+      ? r.tweaklocal.tokens === 0
         ? '100%'
-        : `${Math.round((1 - r.fastui.tokens / r.baseline.tokens) * 100)}%`
+        : `${Math.round((1 - r.tweaklocal.tokens / r.baseline.tokens) * 100)}%`
       : '?';
-  md += `| ${r.task} | ${fmt(r.baseline)} | ${fmt(r.fastui)} (${r.fastui.model}) | ${red} |\n`;
+  md += `| ${r.task} | ${fmt(r.baseline)} | ${fmt(r.tweaklocal)} (${r.tweaklocal.model}) | ${red} |\n`;
 }
 const totals = (k) => results.reduce((a, r) => a + (r[k].tokens || 0), 0);
 const costs = (k) => results.reduce((a, r) => a + (r[k].costUSD || 0), 0);
 const time = (k) => results.reduce((a, r) => a + r[k].wallMs, 0);
-md += `| **Total** | ${(time('baseline') / 1000).toFixed(0)}s · ${totals('baseline')} tok · $${costs('baseline').toFixed(3)} | ${(time('fastui') / 1000).toFixed(0)}s · ${totals('fastui')} tok · $${costs('fastui').toFixed(3)} | **${Math.round((1 - totals('fastui') / totals('baseline')) * 100)}%** |\n`;
+md += `| **Total** | ${(time('baseline') / 1000).toFixed(0)}s · ${totals('baseline')} tok · $${costs('baseline').toFixed(3)} | ${(time('tweaklocal') / 1000).toFixed(0)}s · ${totals('tweaklocal')} tok · $${costs('tweaklocal').toFixed(3)} | **${Math.round((1 - totals('tweaklocal') / totals('baseline')) * 100)}%** |\n`;
 
 fs.writeFileSync(path.join(ROOT, 'packages/benchmark/results.json'), JSON.stringify(results, null, 2));
 fs.writeFileSync(path.join(ROOT, 'packages/benchmark/results.md'), md);

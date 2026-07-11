@@ -1,5 +1,5 @@
 {
   "compilerOptions": {
-    "jsxImportSource": "@fastui/react"
+    "jsxImportSource": "@tweaklocal/react"
   }
 }
