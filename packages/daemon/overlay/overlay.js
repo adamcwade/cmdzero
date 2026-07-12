@@ -8,6 +8,9 @@
 
   const SPACE_SCALE = ['0', '0.5', '1', '1.5', '2', '2.5', '3', '3.5', '4', '5', '6', '7', '8', '9', '10', '11', '12', '14', '16', '20', '24'];
   const FONT_FALLBACK = ['text-xs', 'text-sm', 'text-base', 'text-lg', 'text-xl', 'text-2xl', 'text-3xl', 'text-4xl', 'text-5xl', 'text-6xl', 'text-7xl'];
+  // px scales for the style-system-agnostic lane (inline style edits)
+  const PX_SPACE = [0, 2, 4, 6, 8, 10, 12, 16, 20, 24, 32, 40, 48, 56, 64, 80, 96];
+  const PX_FONT = [10, 11, 12, 13, 14, 15, 16, 18, 20, 24, 28, 32, 36, 42, 48, 56, 64, 72, 88, 96];
 
   const css = `
   #twk-root{position:fixed;inset:0;pointer-events:none;z-index:2147483000;font-family:ui-sans-serif,system-ui,sans-serif}
@@ -116,8 +119,31 @@
       .filter((k) => /^--color-[a-z0-9-]+$/.test(k))
       .map((k) => ({ name: k.slice(8), value: vars[k] }))
       .sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
-    theme = { textSizes, colors, fromDS: colors.length > 0 };
+    // Any CSS custom property whose value is a color — the app's design
+    // tokens, whatever the styling system. Applied as var(--name) so the
+    // source edit stays token-based.
+    const varColors = Object.keys(vars)
+      .filter((k) => vars[k] && CSS.supports('color', vars[k]))
+      .map((k) => ({ name: k, value: vars[k], apply: `var(${k})` }));
+    theme = { textSizes, colors, varColors, fromDS: colors.length > 0 };
     return theme;
+  }
+
+  // Fallback palette: the colors actually rendered on the page right now.
+  function harvestPageColors() {
+    const seen = new Map();
+    const els = document.querySelectorAll('[data-twk]');
+    for (const e of [...els].slice(0, 400)) {
+      const cs = getComputedStyle(e);
+      for (const v of [cs.color, cs.backgroundColor]) {
+        if (!v || v === 'rgba(0, 0, 0, 0)' || v === 'transparent') continue;
+        seen.set(v, (seen.get(v) || 0) + 1);
+      }
+    }
+    return [...seen.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 20)
+      .map(([value]) => ({ name: value, value, apply: value }));
   }
 
   // ---------- hover ----------
@@ -250,6 +276,109 @@
     return { remove, add };
   }
 
+  // ---------- inline-style lane (no Tailwind required) ----------
+  async function applyStyleTweak(styles, optimistic, label) {
+    const s = state.selected;
+    optimistic?.();
+    reposition();
+    try {
+      await api('edit-style', { loc: s.loc, styles });
+    } catch (e) {
+      addTweak({ id: 'x' + Date.now(), status: 'error', label: `${label}: ${e.message}` });
+    }
+    setTimeout(() => { reposition(); renderPopover(); }, 350);
+  }
+
+  function pxStep(current, scale, dir) {
+    let idx = scale.findIndex((v) => v >= Math.round(current));
+    if (idx < 0) idx = scale.length - 1;
+    return scale[Math.min(Math.max(idx + dir, 0), scale.length - 1)];
+  }
+
+  function spacingRowPx(label, cssBase) {
+    const s = state.selected;
+    const row = el('div', 'twk-row');
+    row.append(el('span', 'twk-label', label));
+    const sideSel = el('select');
+    for (const [name, v] of [['All', ''], ['Top', 'Top'], ['Right', 'Right'], ['Bottom', 'Bottom'], ['Left', 'Left']]) {
+      const o = el('option', null, name);
+      o.value = v;
+      sideSel.appendChild(o);
+    }
+    const cur = el('span', 'twk-cur');
+    const show = () => {
+      const prop = cssBase + (sideSel.value || 'Top');
+      cur.textContent = Math.round(parseFloat(getComputedStyle(s.el)[prop]) || 0) + 'px';
+    };
+    show();
+    sideSel.onchange = show;
+    const bump = (dir) => {
+      const side = sideSel.value;
+      const readProp = cssBase + (side || 'Top');
+      const writeProp = side ? cssBase + side : cssBase;
+      const current = parseFloat(getComputedStyle(s.el)[readProp]) || 0;
+      const next = pxStep(current, PX_SPACE, dir);
+      if (next === Math.round(current)) return;
+      applyStyleTweak(
+        { [writeProp]: next + 'px' },
+        () => { s.el.style[writeProp] = next + 'px'; show(); },
+        label
+      );
+    };
+    const minus = el('button', null, '−');
+    const plus = el('button', null, '+');
+    minus.onclick = () => bump(-1);
+    plus.onclick = () => bump(+1);
+    row.append(sideSel, minus, plus, cur);
+    return row;
+  }
+
+  function fontRowPx() {
+    const s = state.selected;
+    const row = el('div', 'twk-row');
+    row.append(el('span', 'twk-label', 'Font'));
+    const cur = el('span', 'twk-cur', Math.round(parseFloat(getComputedStyle(s.el).fontSize)) + 'px');
+    const bump = (dir) => {
+      const current = parseFloat(getComputedStyle(s.el).fontSize) || 16;
+      const next = pxStep(current, PX_FONT, dir);
+      if (next === Math.round(current)) return;
+      applyStyleTweak(
+        { fontSize: next + 'px' },
+        () => { s.el.style.fontSize = next + 'px'; cur.textContent = next + 'px'; },
+        'font'
+      );
+    };
+    const minus = el('button', null, 'A−');
+    const plus = el('button', null, 'A+');
+    minus.onclick = () => bump(-1);
+    plus.onclick = () => bump(+1);
+    row.append(minus, plus, cur);
+    return row;
+  }
+
+  const STYLE_PROPS = {
+    Background: { css: 'backgroundColor', type: 'color' },
+    'Text color': { css: 'color', type: 'color' },
+    'Border color': { css: 'borderColor', type: 'color', ensureBorder: true },
+    Radius: { css: 'borderRadius', type: 'list', options: ['0px', '2px', '4px', '6px', '8px', '12px', '16px', '24px', '9999px'] },
+    Shadow: { css: 'boxShadow', type: 'list', options: ['none', '0 1px 2px rgba(0,0,0,.08)', '0 2px 8px rgba(0,0,0,.12)', '0 4px 16px rgba(0,0,0,.16)', '0 8px 30px rgba(0,0,0,.2)'], labels: ['none', 'sm', 'md', 'lg', 'xl'] },
+  };
+
+  function applyStyleProp(propName, applyValue) {
+    const s = state.selected;
+    const p = STYLE_PROPS[propName];
+    const styles = { [p.css]: applyValue };
+    if (p.ensureBorder && !parseFloat(getComputedStyle(s.el).borderTopWidth)) {
+      styles.borderWidth = '1px';
+      styles.borderStyle = 'solid';
+    }
+    applyStyleTweak(
+      styles,
+      () => { for (const [k, v] of Object.entries(styles)) s.el.style[k] = v; },
+      propName
+    );
+  }
+
   function spacingRow(label, base) {
     const s = state.selected;
     const row = el('div', 'twk-row');
@@ -288,34 +417,35 @@
       pop.appendChild(row);
     }
 
-    // Deterministic style controls write Tailwind classes — without Tailwind
-    // in the app they'd be silent no-ops, so offer copy + NL lanes only.
-    if (!state.tailwind) {
-      const note = el('div', 'twk-row');
-      note.append(el('span', 'twk-meta', 'no Tailwind detected — style tweaks route through the model'));
-      pop.appendChild(note);
-    }
-    if (state.tailwind) {
-    pop.appendChild(spacingRow('Padding', 'p'));
-    pop.appendChild(spacingRow('Margin', 'm'));
+    // Deterministic style controls. Tailwind apps get class edits; everything
+    // else gets inline-style edits — same zero-token lane, any styling system.
+    const tw = state.tailwind;
 
-    const fontRow = el('div', 'twk-row');
-    fontRow.append(el('span', 'twk-label', 'Font'));
-    const fMinus = el('button', null, 'A−');
-    const fPlus = el('button', null, 'A+');
-    fMinus.onclick = () => applyClassTweak(fontStep(s.el, -1), 'font');
-    fPlus.onclick = () => applyClassTweak(fontStep(s.el, +1), 'font');
-    fontRow.append(fMinus, fPlus);
-    const curFont = classList(s.el).find((c) => readTheme().textSizes.includes(c));
-    fontRow.append(el('span', 'twk-cur', curFont || 'inherited'));
-    pop.appendChild(fontRow);
+    if (tw) {
+      pop.appendChild(spacingRow('Padding', 'p'));
+      pop.appendChild(spacingRow('Margin', 'm'));
+      const fontRow = el('div', 'twk-row');
+      fontRow.append(el('span', 'twk-label', 'Font'));
+      const fMinus = el('button', null, 'A−');
+      const fPlus = el('button', null, 'A+');
+      fMinus.onclick = () => applyClassTweak(fontStep(s.el, -1), 'font');
+      fPlus.onclick = () => applyClassTweak(fontStep(s.el, +1), 'font');
+      fontRow.append(fMinus, fPlus);
+      const curFont = classList(s.el).find((c) => readTheme().textSizes.includes(c));
+      fontRow.append(el('span', 'twk-cur', curFont || 'inherited'));
+      pop.appendChild(fontRow);
+    } else {
+      pop.appendChild(spacingRowPx('Padding', 'padding'));
+      pop.appendChild(spacingRowPx('Margin', 'margin'));
+      pop.appendChild(fontRowPx());
+    }
 
     // property editor
     const propRow = el('div', 'twk-row');
     propRow.append(el('span', 'twk-label', 'Style'));
     const propSel = el('select');
     propSel.appendChild(el('option', null, 'Choose property…'));
-    for (const name of Object.keys(PROPS)) {
+    for (const name of Object.keys(tw ? PROPS : STYLE_PROPS)) {
       const o = el('option', null, name);
       o.value = name;
       propSel.appendChild(o);
@@ -326,31 +456,47 @@
     pop.appendChild(swatches);
     propSel.onchange = () => {
       swatches.textContent = '';
-      const p = PROPS[propSel.value];
+      const p = (tw ? PROPS : STYLE_PROPS)[propSel.value];
       if (!p) return;
       if (p.type === 'color') {
-        const { colors, fromDS } = readTheme();
-        if (!fromDS) {
-          swatches.append(el('span', 'twk-meta', 'no design-system colors found in page CSS'));
-          return;
-        }
-        for (const c of colors) {
-          const b = el('button', 'twk-swatch');
-          b.style.background = c.value;
-          b.title = `${p.prefix}-${c.name}`;
-          b.onclick = () => applyClassTweak(propChange(s.el, propSel.value, `${p.prefix}-${c.name}`), propSel.value);
-          swatches.appendChild(b);
+        if (tw) {
+          const { colors, fromDS } = readTheme();
+          if (!fromDS) {
+            swatches.append(el('span', 'twk-meta', 'no design-system colors found in page CSS'));
+            return;
+          }
+          for (const c of colors) {
+            const b = el('button', 'twk-swatch');
+            b.style.background = c.value;
+            b.title = `${p.prefix}-${c.name}`;
+            b.onclick = () => applyClassTweak(propChange(s.el, propSel.value, `${p.prefix}-${c.name}`), propSel.value);
+            swatches.appendChild(b);
+          }
+        } else {
+          // design tokens if the app defines color custom properties,
+          // otherwise the palette actually rendered on the page
+          const { varColors } = readTheme();
+          const palette = varColors.length ? varColors.slice(0, 48) : harvestPageColors();
+          for (const c of palette) {
+            const b = el('button', 'twk-swatch');
+            b.style.background = c.value;
+            b.title = c.name;
+            b.onclick = () => applyStyleProp(propSel.value, c.apply);
+            swatches.appendChild(b);
+          }
         }
       } else {
-        for (const opt of p.options) {
-          const b = el('button', 'twk-chip', opt);
-          b.onclick = () => applyClassTweak(propChange(s.el, propSel.value, opt), propSel.value);
+        p.options.forEach((opt, i) => {
+          const b = el('button', 'twk-chip', p.labels ? p.labels[i] : opt);
+          b.onclick = () =>
+            tw
+              ? applyClassTweak(propChange(s.el, propSel.value, opt), propSel.value)
+              : applyStyleProp(propSel.value, opt);
           swatches.appendChild(b);
-        }
+        });
       }
       reposition();
     };
-    } // end Tailwind-only controls
 
     const nlRow = el('div', 'twk-row');
     const input = el('input');

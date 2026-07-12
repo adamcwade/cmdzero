@@ -117,6 +117,70 @@ export function applyClassEdit(root, loc, removes = [], adds = []) {
   return writeChecked(abs, content, next);
 }
 
+/**
+ * Merge CSS properties into the element's inline style prop — the
+ * styling-system-agnostic edit lane (works with CSS modules, styled-components,
+ * vanilla CSS, anything). styles: { camelCaseProp: value | null }, null removes.
+ * Appended keys win in React's style object, so replacements are drop+append.
+ */
+export function applyStyleEdit(root, loc, styles) {
+  const { abs, content, element } = loadTarget(root, loc);
+  const opening = element.openingElement;
+  const toSrc = (v) => (typeof v === 'number' ? String(v) : `'${String(v).replace(/'/g, "\\'")}'`);
+  const attr = opening.attributes.find(
+    (a) => a.type === 'JSXAttribute' && a.name.name === 'style'
+  );
+
+  if (!attr) {
+    const entries = Object.entries(styles).filter(([, v]) => v != null);
+    if (!entries.length) return writeChecked(abs, content, content);
+    const obj = entries.map(([k, v]) => `${k}: ${toSrc(v)}`).join(', ');
+    const pos = opening.name.end;
+    return writeChecked(
+      abs,
+      content,
+      content.slice(0, pos) + ` style={{ ${obj} }}` + content.slice(pos)
+    );
+  }
+
+  const expr =
+    attr.value && attr.value.type === 'JSXExpressionContainer' ? attr.value.expression : null;
+  if (!expr || expr.type !== 'ObjectExpression')
+    throw new Error('style prop is not an object literal — describe the change instead');
+
+  // Rebuild the object: keep untouched properties (and spreads) verbatim,
+  // drop replaced/removed keys, append new values last.
+  const parts = [];
+  for (const p of expr.properties) {
+    if (p.type === 'ObjectProperty' && !p.computed) {
+      const name =
+        p.key.type === 'Identifier' ? p.key.name : p.key.type === 'StringLiteral' ? p.key.value : null;
+      if (name && name in styles) continue;
+    }
+    parts.push(content.slice(p.start, p.end));
+  }
+  for (const [k, v] of Object.entries(styles)) if (v != null) parts.push(`${k}: ${toSrc(v)}`);
+
+  // Preserve multi-line formatting when the original object was multi-line.
+  const original = content.slice(expr.start, expr.end);
+  let objSrc;
+  if (original.includes('\n') && expr.properties.length) {
+    const firstProp = expr.properties[0];
+    const lineStart = content.lastIndexOf('\n', firstProp.start) + 1;
+    const indent = content.slice(lineStart, firstProp.start).match(/^\s*/)[0];
+    const braceLineStart = content.lastIndexOf('\n', expr.end - 1) + 1;
+    const braceIndent = content.slice(braceLineStart).match(/^\s*/)[0];
+    objSrc = `{\n${indent}${parts.join(`,\n${indent}`)},\n${braceIndent}}`;
+  } else {
+    objSrc = `{ ${parts.join(', ')} }`;
+  }
+  return writeChecked(
+    abs,
+    content,
+    content.slice(0, expr.start) + objSrc + content.slice(expr.end)
+  );
+}
+
 /** Returns null if the file parses, else the parse error message. */
 export function checkSyntax(root, file) {
   const abs = path.resolve(root, file);

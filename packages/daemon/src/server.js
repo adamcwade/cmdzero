@@ -2,7 +2,7 @@ import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { describeTarget, applyTextEdit, applyClassEdit, parseLoc, checkSyntax } from './resolver.js';
+import { describeTarget, applyTextEdit, applyClassEdit, applyStyleEdit, parseLoc, checkSyntax } from './resolver.js';
 import { classify, buildPrompt, runClaude } from './router.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -103,6 +103,17 @@ export function startServer({ root, port = 4100 }) {
           const write = applyClassEdit(root, body.loc, body.remove || [], body.add || []);
           remember(id, write);
           broadcast({ type: 'tweak', id, kind: 'style', status: 'done', tokens: 0, label: `style: ${(body.add || []).join(' ')}`, ...recordSavings(0, 50) });
+          return json(res, { ok: true, id });
+        }
+
+        if (url.pathname === '/api/edit-style') {
+          const id = nextId++;
+          const write = applyStyleEdit(root, body.loc, body.styles || {});
+          remember(id, write);
+          const desc = Object.entries(body.styles || {})
+            .map(([k, v]) => `${k}: ${v}`)
+            .join(', ');
+          broadcast({ type: 'tweak', id, kind: 'style', status: 'done', tokens: 0, label: `style: ${desc.slice(0, 50)}`, ...recordSavings(0, 50) });
           return json(res, { ok: true, id });
         }
 
