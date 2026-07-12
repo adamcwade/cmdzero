@@ -49,7 +49,7 @@ export function loadTarget(root, loc) {
   });
   element = element || nearMiss;
   if (!element) throw new Error(`no JSX element at ${loc}`);
-  return { file, abs, content, element };
+  return { file, abs, content, element, ast };
 }
 
 export function describeTarget(root, loc) {
@@ -201,38 +201,78 @@ function removeElementFromContent(content, element, file) {
   }
 }
 
-// If `element` is the sole rendered output of a NAMED component function,
-// return that component's name. Returns null when the innermost enclosing
-// function is an anonymous callback (e.g. a `.map()` list item) — those are
-// data-driven and belong in the model lane, not a usage removal.
-function soleReturnComponentName(ast, element) {
-  // innermost function whose span contains the element
-  let inner = null;
-  walk(ast, (n) => {
-    if (
-      n.type !== 'FunctionDeclaration' &&
-      n.type !== 'FunctionExpression' &&
-      n.type !== 'ArrowFunctionExpression'
-    ) return;
-    if (n.start <= element.start && n.end >= element.end) {
-      if (!inner || (n.end - n.start) < (inner.end - inner.start)) inner = n;
+// Ancestor chain from `element` up to the Program node (element first).
+function ancestorChain(ast, element) {
+  const chain = [];
+  (function descend(node, trail) {
+    if (!node || typeof node.type !== 'string') return false;
+    if (node === element) {
+      chain.push(element, ...trail);
+      return true;
     }
-  });
-  if (!inner) return null;
+    if (node.start > element.start || node.end < element.end) return false;
+    for (const key of Object.keys(node)) {
+      if (key === 'loc') continue;
+      const v = node[key];
+      const kids = Array.isArray(v) ? v : [v];
+      for (const kid of kids) {
+        if (kid && typeof kid.type === 'string' && descend(kid, [node, ...trail])) return true;
+      }
+    }
+    return false;
+  })(ast, []);
+  return chain;
+}
 
-  // named function declaration: function Foo() {}
-  if (inner.id && inner.id.name) return inner.id.name;
+const FN_TYPES = new Set(['FunctionDeclaration', 'FunctionExpression', 'ArrowFunctionExpression']);
 
-  // arrow/function bound to a name: const Foo = () => {} / const Foo = function(){}
+// If the chain shows `element` is the RETURNED VALUE of the innermost enclosing
+// function (only Return/Block between them), return that function node.
+// This gate matters: without it, a parse-breaking delete anywhere inside a
+// named component would wrongly escalate to removing the component's usage.
+function returningFunction(chain) {
+  for (let i = 1; i < chain.length; i++) {
+    const t = chain[i].type;
+    if (t === 'ReturnStatement' || t === 'BlockStatement') continue;
+    return FN_TYPES.has(t) ? chain[i] : null;
+  }
+  return null;
+}
+
+function nameOfFunction(ast, fn) {
+  if (!fn) return null;
+  if (fn.id && fn.id.name) return fn.id.name;
   let name = null;
   walk(ast, (n) => {
     if (
       n.type === 'VariableDeclarator' &&
-      n.init && n.init.start === inner.start && n.init.end === inner.end &&
+      n.init && n.init.start === fn.start && n.init.end === fn.end &&
       n.id && n.id.type === 'Identifier'
     ) name = n.id.name;
   });
-  return name; // null if the innermost fn is an anonymous callback (map, etc.)
+  return name;
+}
+
+// Walk up from the element looking for a `{...}` JSX expression whose whole
+// removal parses — covers `{cond && <el/>}` (conditional) and `{arr.map(...)}`
+// (list template: removing it removes the rendered list). Never crosses a
+// function boundary except an inline callback (a function that is itself a
+// call argument, e.g. the .map render callback).
+function removableExpressionContainer(chain) {
+  for (let i = 1; i < chain.length; i++) {
+    const node = chain[i];
+    if (node.type === 'JSXExpressionContainer') {
+      const inner = chain[i - 1];
+      const isList = FN_TYPES.has(inner?.type) || inner?.type === 'CallExpression';
+      return { container: node, kind: isList ? 'list' : 'conditional block' };
+    }
+    if (FN_TYPES.has(node.type)) {
+      // crossing a function is only allowed for inline callbacks (map etc.)
+      const parent = chain[i + 1];
+      if (!parent || parent.type !== 'CallExpression') return null;
+    }
+  }
+  return null;
 }
 
 // Walk the project for JSX usages of <Name ...>. Returns [{file, element}].
@@ -267,15 +307,19 @@ function findUsages(root, name) {
 }
 
 /**
- * Delete behavior:
- *  - Normal element (has siblings / non-sole child): remove it in place.
- *  - Sole return of a component: the element IS the component's whole output,
- *    so "delete this" means remove the component's rendered *usage*. If the
- *    component is used in exactly one place, remove that usage deterministically.
- *    Otherwise refuse with an actionable message (ambiguous → model lane).
+ * Delete behavior, in order:
+ *  1. Normal element (has siblings): remove it in place.
+ *  2. Element inside a `{...}` JSX expression whose removal parses — a list
+ *     template (`{arr.map(...)}`) or a conditional (`{cond && <el/>}`):
+ *     remove the whole expression. Deleting a list template removes the
+ *     rendered list — that's what the on-screen "container" is.
+ *  3. Sole return of a NAMED component used in exactly one place: remove that
+ *     usage at its call site.
+ *  Otherwise refuse with an actionable message (ambiguous → model lane).
  */
 export function applyDeleteElement(root, loc, { dryRun = false } = {}) {
-  const { abs, content, element, file } = loadTarget(root, loc);
+  // reuse loadTarget's AST — element identity must hold for the ancestor walk
+  const { abs, content, element, file, ast } = loadTarget(root, loc);
 
   const inPlace = removeElementFromContent(content, element, file);
   if (inPlace !== null) {
@@ -283,13 +327,25 @@ export function applyDeleteElement(root, loc, { dryRun = false } = {}) {
     return writeChecked(abs, content, inPlace);
   }
 
-  // Removing the element in place would break the file → it's the sole return.
-  const ast = parseSource(content, file);
-  const name = soleReturnComponentName(ast, element);
+  // In-place removal breaks the file — walk up for a deletable wrapper.
+  const chain = ancestorChain(ast, element);
+
+  const wrapper = removableExpressionContainer(chain);
+  if (wrapper) {
+    const next = removeElementFromContent(content, wrapper.container, file);
+    if (next !== null) {
+      if (dryRun) return { abs, before: content, after: next, wouldWrite: false, removedBlock: wrapper.kind };
+      return { ...writeChecked(abs, content, next), removedBlock: wrapper.kind };
+    }
+  }
+
+  // Not a removable wrapper — usage removal, but ONLY when the element really
+  // is the returned output of a named component.
+  const fn = returningFunction(chain);
+  const name = nameOfFunction(ast, fn);
   if (!name || !/^[A-Z]/.test(name)) {
-    // no resolvable component name (anonymous default, or a .map() list item)
     throw new Error(
-      "can't delete this in place — it's the only thing rendered here (likely a list item or an unnamed component). Describe the change instead (e.g. \"remove this from the list\") and it'll route through the model."
+      "can't delete this in place — it's the only thing rendered here and there's no removable wrapper. Describe the change instead (e.g. \"remove this from the list\") and it'll route through the model."
     );
   }
 
