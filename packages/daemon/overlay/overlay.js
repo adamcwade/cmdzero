@@ -429,8 +429,13 @@
     // text, so DOM shape says nothing about what's editable in the JSX.
     const literals = s.meta ? s.meta.texts : null;
     if (literals && literals.length) {
-      if (hasEditableText(s.el) && literals.length === 1) {
-        // clean leaf → the nice path: edit directly in the page
+      // In-place editing only when the single literal IS the element's whole
+      // text (animation-split DOM still qualifies — same text, different
+      // nodes). Partial literals (mixed with {expressions}) get input fields
+      // showing exactly the editable part.
+      const wholeText =
+        literals.length === 1 && literals[0].value.trim() === s.el.textContent.trim();
+      if (wholeText) {
         const row = el('div', 'twk-row');
         row.append(el('span', 'twk-label', 'Copy'));
         const b = el('button', null, '✎ Edit text in place');
@@ -566,31 +571,53 @@
   }
 
   // ---------- inline copy editing ----------
+  // Works on ANY element whose source has one text literal — titles,
+  // descriptions, buttons, links — even when animations have split the DOM
+  // into spans: we swap in the source text for editing and keep the original
+  // DOM aside so Esc restores it untouched.
   function startTextEdit() {
     const s = state.selected;
-    state.editing = { el: s.el, original: s.el.textContent };
+    // the popover can outlive its selection (HMR, reloads) — never throw
+    const literal = s?.meta?.texts?.[0]?.value;
+    if (literal == null || !document.contains(s.el)) return;
+    const frag = document.createDocumentFragment();
+    while (s.el.firstChild) frag.appendChild(s.el.firstChild);
+    state.editing = {
+      el: s.el,
+      loc: s.loc,
+      literal,
+      frag,
+      prevUserSelect: s.el.style.userSelect,
+    };
+    s.el.textContent = literal;
+    s.el.style.userSelect = 'text'; // buttons often have user-select: none
     try { s.el.contentEditable = 'plaintext-only'; } catch { s.el.contentEditable = 'true'; }
     s.el.focus();
     document.getSelection()?.selectAllChildren(s.el);
+    hint.textContent = 'editing copy — Enter saves · Esc cancels · click away saves';
   }
 
   async function finishTextEdit(commit) {
     const ed = state.editing;
     if (!ed) return;
     state.editing = null;
-    ed.el.contentEditable = 'false';
     ed.el.removeAttribute('contenteditable');
+    ed.el.style.userSelect = ed.prevUserSelect;
+    if (state.selectMode) hint.textContent = 'select mode — click an element · Esc to exit';
     const newText = ed.el.textContent.trim();
-    if (!commit || newText === ed.original.trim()) {
-      ed.el.textContent = ed.original;
+    const restore = () => {
+      ed.el.textContent = '';
+      ed.el.appendChild(ed.frag);
+    };
+    if (!commit || !newText || newText === ed.literal.trim()) {
+      restore();
       return;
     }
     try {
-      // prefer the source literal as oldText — the DOM may differ in whitespace
-      const literal = state.selected.meta?.texts?.[0]?.value ?? ed.original;
-      await api('edit-text', { loc: state.selected.loc, oldText: literal, newText });
+      await api('edit-text', { loc: ed.loc, oldText: ed.literal, newText });
+      // keep the new text; HMR re-renders the component (animations included)
     } catch (e) {
-      ed.el.textContent = ed.original;
+      restore();
       addTweak({ id: 'x' + Date.now(), status: 'error', label: `copy: ${e.message}` });
     }
     setTimeout(() => { reposition(); loadMeta(); }, 350);
@@ -699,7 +726,16 @@
   addEventListener('click', (e) => {
     if (!state.selectMode) return;
     if (inOverlay(e.target)) return;
-    if (state.editing) return; // clicks inside editable text are fine
+    if (state.editing) {
+      // clicks inside the editable text place the caret; clicks anywhere
+      // else save the edit (and never navigate/select mid-edit)
+      if (!state.editing.el.contains(e.target)) {
+        e.preventDefault();
+        e.stopPropagation();
+        finishTextEdit(true);
+      }
+      return;
+    }
     e.preventDefault();
     e.stopPropagation();
     const target = e.target instanceof Element ? e.target.closest('[data-twk]') : null;
