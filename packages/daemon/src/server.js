@@ -2,7 +2,7 @@ import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { describeTarget, applyTextEdit, applyClassEdit, applyStyleEdit, parseLoc, checkSyntax } from './resolver.js';
+import { describeTarget, applyTextEdit, applyClassEdit, applyStyleEdit, applyDeleteElement, parseLoc, checkSyntax } from './resolver.js';
 import { classify, buildPrompt, runClaude } from './router.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -114,6 +114,15 @@ export function startServer({ root, port = 4100 }) {
             .map(([k, v]) => `${k}: ${v}`)
             .join(', ');
           broadcast({ type: 'tweak', id, kind: 'style', status: 'done', tokens: 0, label: `style: ${desc.slice(0, 50)}`, ...recordSavings(0, 50) });
+          return json(res, { ok: true, id });
+        }
+
+        if (url.pathname === '/api/delete') {
+          const id = nextId++;
+          const target = describeTarget(root, body.loc);
+          const write = applyDeleteElement(root, body.loc);
+          remember(id, write);
+          broadcast({ type: 'tweak', id, kind: 'delete', status: 'done', tokens: 0, label: `deleted <${target.tagName}>`, ...recordSavings(0, 50) });
           return json(res, { ok: true, id });
         }
 

@@ -17,6 +17,7 @@
   .twk-outline{position:fixed;border:1.5px solid #6366f1;border-radius:3px;background:rgba(99,102,241,.08);pointer-events:none;transition:all .04s linear}
   .twk-outline.twk-selected{border-color:#10b981;background:rgba(16,185,129,.06)}
   .twk-badge{position:fixed;background:#312e81;color:#e0e7ff;font-size:11px;padding:2px 7px;border-radius:4px;pointer-events:none;white-space:nowrap;transform:translateY(-100%)}
+  .twk-pop-label{position:fixed;background:#10b981;color:#052e1b;font-size:12px;font-weight:600;padding:3px 10px;border-radius:8px 8px 0 0;pointer-events:none;white-space:nowrap;transform:translateY(-100%)}
   .twk-pop{position:fixed;background:#111827;color:#f9fafb;border:1.5px solid #10b981;border-radius:10px;box-shadow:0 8px 30px rgba(0,0,0,.35);padding:8px;pointer-events:auto;display:flex;flex-direction:column;gap:6px;min-width:300px;max-width:340px;font-size:12px}
   .twk-row{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
   .twk-pop button{background:#374151;color:#f9fafb;border:none;border-radius:6px;padding:4px 9px;font-size:12px;cursor:pointer}
@@ -31,13 +32,15 @@
   .twk-swatch:hover{transform:scale(1.15)}
   .twk-chip{font-size:10.5px !important;padding:2px 6px !important}
   .twk-tray{position:fixed;right:14px;bottom:14px;display:flex;flex-direction:column;gap:6px;pointer-events:auto;max-width:360px}
-  .twk-total{background:#064e3b;color:#a7f3d0;border-radius:8px;padding:5px 10px;font-size:11.5px;box-shadow:0 4px 14px rgba(0,0,0,.3)}
-  .twk-tweak{background:#111827;color:#e5e7eb;border-radius:8px;padding:6px 10px;font-size:11.5px;display:flex;gap:8px;align-items:center;box-shadow:0 4px 14px rgba(0,0,0,.3)}
+  .twk-total{background:#064e3b;color:#a7f3d0;border-radius:8px;padding:6px 11px;font-size:13px;box-shadow:0 4px 14px rgba(0,0,0,.3)}
+  .twk-tweak{background:#111827;color:#e5e7eb;border-radius:8px;padding:7px 11px;font-size:13px;display:flex;gap:8px;align-items:center;box-shadow:0 4px 14px rgba(0,0,0,.3)}
   .twk-dot{width:8px;height:8px;border-radius:50%;flex:none}
   .twk-dot.done{background:#10b981}.twk-dot.queued,.twk-dot.running{background:#f59e0b;animation:twk-pulse 1s infinite}.twk-dot.error{background:#ef4444}.twk-dot.reverted{background:#6b7280}
-  .twk-tweak button{background:none;border:none;color:#818cf8;cursor:pointer;font-size:11px;padding:0}
+  .twk-tweak button{background:none;border:none;color:#818cf8;cursor:pointer;font-size:12.5px;padding:0}
   .twk-meta{color:#9ca3af}
-  .twk-hint{position:fixed;left:14px;bottom:14px;background:#111827;color:#9ca3af;font-size:11px;padding:5px 10px;border-radius:6px;pointer-events:none}
+  .twk-hint{position:fixed;left:14px;bottom:14px;background:#111827;color:#9ca3af;font-size:12.5px;padding:6px 11px;border-radius:6px;pointer-events:none}
+  .twk-danger{background:#450a0a !important;color:#fca5a5 !important}
+  .twk-danger:hover{background:#7f1d1d !important}
   [contenteditable="plaintext-only"],[contenteditable="true"]{outline:2px dashed #10b981;outline-offset:2px}
   @keyframes twk-pulse{50%{opacity:.4}}`;
 
@@ -76,6 +79,12 @@
   };
   const inOverlay = (t) => t instanceof Node && root.contains(t);
   const classList = (e) => (e.getAttribute('class') || '').split(/\s+/).filter(Boolean);
+  // "components/sections/Hero.tsx:50:9" (or absolute path) -> "Hero.tsx:50"
+  const shortLoc = (loc) => {
+    const m = /^(.*):(\d+):(\d+)$/.exec(loc);
+    if (!m) return loc;
+    return `${m[1].split('/').pop()}:${m[2]}`;
+  };
 
   function positionBox(box, target) {
     const r = target.getBoundingClientRect();
@@ -160,7 +169,7 @@
     }
     hoverBox.style.display = hoverBadge.style.display = 'block';
     const r = positionBox(hoverBox, target);
-    hoverBadge.textContent = `<${target.tagName.toLowerCase()}> ${target.getAttribute('data-twk')}`;
+    hoverBadge.textContent = `<${target.tagName.toLowerCase()}> ${shortLoc(target.getAttribute('data-twk'))}`;
     Object.assign(hoverBadge.style, { left: r.left + 'px', top: Math.max(r.top - 4, 16) + 'px' });
   }
 
@@ -171,6 +180,9 @@
   const pop = el('div', 'twk-pop');
   pop.style.display = 'none';
   root.appendChild(pop);
+  const popLabel = el('div', 'twk-pop-label');
+  popLabel.style.display = 'none';
+  root.appendChild(popLabel);
 
   function select(target) {
     finishTextEdit(false);
@@ -202,6 +214,7 @@
     state.selected = null;
     selBox.style.display = 'none';
     pop.style.display = 'none';
+    popLabel.style.display = 'none';
   }
 
   function reposition() {
@@ -215,8 +228,13 @@
     }
     const r = positionBox(selBox, s.el);
     pop.style.display = 'flex';
-    const top = r.bottom + 8 + pop.offsetHeight > innerHeight ? r.top - pop.offsetHeight - 8 : r.bottom + 8;
-    Object.assign(pop.style, { left: Math.min(Math.max(r.left, 8), innerWidth - 356) + 'px', top: Math.max(top, 8) + 'px' });
+    const labelH = 22; // room for the file:line tab above the panel
+    const top = r.bottom + 8 + labelH + pop.offsetHeight > innerHeight ? r.top - pop.offsetHeight - 8 : r.bottom + 8 + labelH;
+    const left = Math.min(Math.max(r.left, 8), innerWidth - 356);
+    Object.assign(pop.style, { left: left + 'px', top: Math.max(top, 8 + labelH) + 'px' });
+    popLabel.style.display = 'block';
+    popLabel.textContent = shortLoc(s.loc);
+    Object.assign(popLabel.style, { left: left + 'px', top: pop.style.top });
   }
 
   // ---------- class tweaks ----------
@@ -420,9 +438,7 @@
     if (!s) return;
     pop.textContent = '';
 
-    const head = el('div', 'twk-row');
-    head.append(el('span', 'twk-meta', s.loc));
-    pop.appendChild(head);
+    // location now lives in the green tab above the panel (popLabel)
 
     // Copy lane, driven by the SOURCE text literals (s.meta.texts), not the
     // DOM: animation libs split text into spans and expressions render as
@@ -568,6 +584,23 @@
     input.onkeydown = (e) => { if (e.key === 'Enter') send(); e.stopPropagation(); };
     nlRow.append(input, go);
     pop.appendChild(nlRow);
+
+    const actions = el('div', 'twk-row');
+    const del = el('button', 'twk-danger', '🗑 Delete element');
+    del.onclick = async () => {
+      const sel = state.selected;
+      if (!sel || !document.contains(sel.el)) return;
+      sel.el.style.display = 'none'; // optimistic; HMR makes it real
+      deselect();
+      try {
+        await api('delete', { loc: sel.loc });
+      } catch (e) {
+        sel.el.style.display = '';
+        addTweak({ id: 'x' + Date.now(), status: 'error', label: `delete: ${e.message}` });
+      }
+    };
+    actions.appendChild(del);
+    pop.appendChild(actions);
   }
 
   // ---------- inline copy editing ----------

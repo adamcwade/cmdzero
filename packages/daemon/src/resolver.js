@@ -181,6 +181,30 @@ export function applyStyleEdit(root, loc, styles) {
   );
 }
 
+/**
+ * Delete the element from source, consuming its whole line(s) when it sits
+ * alone on them. Refuses (throws) if the removal would leave the file
+ * unparseable — e.g. deleting a component's only root element.
+ */
+export function applyDeleteElement(root, loc) {
+  const { abs, content, element, file } = loadTarget(root, loc);
+  let start = element.start;
+  let end = element.end;
+  const lineStart = content.lastIndexOf('\n', start - 1) + 1;
+  const afterMatch = content.slice(end).match(/^[ \t]*\n/);
+  if (/^[ \t]*$/.test(content.slice(lineStart, start)) && afterMatch) {
+    start = lineStart;
+    end += afterMatch[0].length;
+  }
+  const next = content.slice(0, start) + content.slice(end);
+  try {
+    parseSource(next, file);
+  } catch {
+    throw new Error('deleting this element would break the file — describe the change instead');
+  }
+  return writeChecked(abs, content, next);
+}
+
 /** Returns null if the file parses, else the parse error message. */
 export function checkSyntax(root, file) {
   const abs = path.resolve(root, file);
