@@ -1,6 +1,12 @@
 {
   "name": "@tweaklocal/babel-plugin",
   "version": "0.0.1",
+  "description": "Build-time JSX source stamping for TweakLocal — a Babel plugin alternative to @tweaklocal/react for setups where changing jsxImportSource isn't an option.",
+  "license": "MIT",
   "main": "index.js",
-  "license": "MIT"
+  "files": ["index.js", "package.json"],
+  "peerDependencies": {
+    "@babel/core": "^7.0.0"
+  },
+  "keywords": ["tweaklocal", "babel-plugin", "jsx", "source-maps", "devtools"]
 }
