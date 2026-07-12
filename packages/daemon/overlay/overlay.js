@@ -18,8 +18,9 @@
   .twk-outline.twk-selected{border-color:#10b981;background:rgba(16,185,129,.06)}
   .twk-badge{position:fixed;background:#312e81;color:#e0e7ff;font-size:11px;padding:2px 7px;border-radius:4px;pointer-events:none;white-space:nowrap;transform:translateY(-100%)}
   .twk-pop-label{position:fixed;background:#10b981;color:#052e1b;font-size:13.8px;font-weight:700;padding:3px 10px;border-radius:8px 8px 0 0;pointer-events:none;white-space:nowrap;transform:translate(-50%,-100%);text-align:center}
-  .twk-delete-btn{position:fixed;width:24px;height:24px;border-radius:50%;background:#450a0a;color:#fca5a5;border:1.5px solid #7f1d1d;cursor:pointer;pointer-events:auto;display:flex;align-items:center;justify-content:center;font-size:12px;line-height:1;box-shadow:0 2px 8px rgba(0,0,0,.35);transform:translate(50%,-50%)}
-  .twk-delete-btn:hover{background:#7f1d1d;color:#fecaca}
+  .twk-delete-btn{position:fixed;width:22px;height:22px;border-radius:50%;background:#dc2626;color:#fff;border:none;cursor:pointer;pointer-events:auto;display:flex;align-items:center;justify-content:center;padding:0;box-shadow:0 2px 6px rgba(0,0,0,.4)}
+  .twk-delete-btn:hover{background:#ef4444}
+  .twk-delete-btn svg{width:12px;height:12px;pointer-events:none}
   .twk-pop{position:fixed;background:#111827;color:#f9fafb;border:1.5px solid #10b981;border-radius:10px;box-shadow:0 8px 30px rgba(0,0,0,.35);padding:8px;pointer-events:auto;display:flex;flex-direction:column;gap:6px;min-width:300px;max-width:340px;font-size:12px}
   .twk-row{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
   .twk-pop button{background:#374151;color:#f9fafb;border:none;border-radius:6px;padding:4px 9px;font-size:12px;cursor:pointer}
@@ -183,7 +184,9 @@
   const popLabel = el('div', 'twk-pop-label');
   popLabel.style.display = 'none';
   root.appendChild(popLabel);
-  const deleteBtn = el('button', 'twk-delete-btn', '🗑');
+  const deleteBtn = el('button', 'twk-delete-btn');
+  deleteBtn.innerHTML =
+    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12"/><path d="M9 7V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v3"/></svg>';
   deleteBtn.style.display = 'none';
   deleteBtn.title = 'Delete element';
   root.appendChild(deleteBtn);
@@ -255,7 +258,11 @@
     popLabel.textContent = shortLoc(s.loc);
     Object.assign(popLabel.style, { left: (left + pop.offsetWidth / 2) + 'px', top: pop.style.top });
     deleteBtn.style.display = 'flex';
-    Object.assign(deleteBtn.style, { left: r.right + 'px', top: r.top + 'px' });
+    const inset = 4;
+    Object.assign(deleteBtn.style, {
+      left: r.right - 22 - inset + 'px',
+      top: r.top + inset + 'px',
+    });
   }
 
   // ---------- class tweaks ----------
