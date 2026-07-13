@@ -1,7 +1,3 @@
-<p align="center">
-  <img src="https://raw.githubusercontent.com/adamcwade/cmdzero/main/assets/hero.png" alt="CmdZero — tweak your UI live in the browser; changes land in your source" width="900">
-</p>
-
 # CmdZero
 
 Tweak your UI live in the browser — the changes are written straight to your source files.
