@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describeTarget, applyTextEdit, applyClassEdit, applyStyleEdit, applyDeleteElement, applyMove, parseLoc, checkSyntax } from './resolver.js';
-import { classify, buildPrompt, runClaude } from './router.js';
+import { classify, buildPrompt, runClaude, runDeploy } from './router.js';
 import { initTelemetry, DISCLOSURE } from './telemetry.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -182,6 +182,32 @@ export function startServer({ root, port = 4100 }) {
           // router may still consult the Haiku classifier on ambiguous input)
           const route = await classify(body.instruction || '', { cwd: root });
           return json(res, { ok: true, ...route });
+        }
+
+        if (url.pathname === '/api/deploy') {
+          const id = nextId++;
+          telemetry.record('deploy');
+          broadcast({ type: 'tweak', id, kind: 'deploy', status: 'queued', label: 'Build & Deploy — committing & deploying…' });
+          json(res, { ok: true, id });
+          const result = await runDeploy({
+            cwd: root,
+            onEvent: (e) => broadcast({ type: 'tweak', id, ...e }),
+            onSpawn: (child) => running.set(String(id), child),
+          });
+          running.delete(String(id));
+          if (result.cancelled) {
+            broadcast({ type: 'tweak', id, status: 'cancelled', label: 'deploy cancelled' });
+            return;
+          }
+          broadcast({
+            type: 'tweak', id,
+            kind: 'deploy',
+            status: result.ok ? 'done' : 'error',
+            durationMs: result.durationMs,
+            label: result.ok ? (result.url ? `deployed → ${result.url}` : 'deployed to production') : 'deploy failed',
+            error: result.ok ? undefined : (result.error || '').slice(0, 200),
+          });
+          return;
         }
 
         if (url.pathname === '/api/nl') {

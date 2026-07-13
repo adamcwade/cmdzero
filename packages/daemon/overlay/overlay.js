@@ -81,6 +81,9 @@
   .cz-banner .cz-stat b{color:#f1f5f9;font-weight:600;margin-left:5px}
   .cz-banner .cz-stat.cz-accent b{color:#6ee7b7}
   .cz-banner a{color:#6ee7b7;text-decoration:none;flex:none}
+  .cz-banner .cz-deploy{flex:none;background:#10b981;color:#052e1b;border:none;border-radius:7px;padding:5px 12px;font-size:11.5px;font-weight:700;cursor:pointer;pointer-events:auto}
+  .cz-banner .cz-deploy:hover{background:#34d399}
+  .cz-banner .cz-deploy:disabled{opacity:.6;cursor:default}
   .cz-banner a:hover{text-decoration:underline}
   .cz-banner .cz-idle{color:#64748b}
   .cz-wrap{display:flex;flex-direction:column;align-items:flex-end;gap:6px}
@@ -1083,11 +1086,26 @@
   const brand = el('div', 'cz-brand');
   brand.innerHTML = '<kbd>⌘0</kbd> CmdZero';
   const bannerStats = el('div', 'cz-stats');
-  const reportLink = el('a', null, 'report →');
-  reportLink.href = 'https://cmdzero.dev/report';
-  reportLink.target = '_blank';
-  reportLink.rel = 'noopener';
-  banner.append(brand, bannerStats, reportLink);
+  // Build & Deploy — commits the current tweaks and pushes them to the live site
+  // (the daemon runs it through headless claude).
+  const deployBtn = el('button', 'cz-deploy', 'Build & Deploy ↗');
+  let deployId = null;
+  deployBtn.onclick = async () => {
+    if (deployBtn.disabled) return;
+    if (!confirm('Build & deploy the current tweaks to your live site?')) return;
+    deployBtn.disabled = true;
+    deployBtn.textContent = 'Deploying…';
+    try {
+      const r = await api('deploy', {});
+      deployId = String(r.id);
+      addTweak({ id: r.id, status: 'queued', label: 'Build & Deploy — committing & deploying…' });
+    } catch (e) {
+      resetDeployBtn();
+      addTweak({ id: 'x' + Date.now(), status: 'error', label: `deploy: ${e.message}` });
+    }
+  };
+  function resetDeployBtn() { deployBtn.disabled = false; deployBtn.textContent = 'Build & Deploy ↗'; }
+  banner.append(brand, bannerStats, deployBtn);
   root.appendChild(banner);
   // Push the page down so the banner sits ABOVE the site rather than over it.
   // Inject a stylesheet instead of mutating body's style attribute: frameworks
@@ -1225,8 +1243,10 @@
       row._dot.className = 'cz-dot ' + t.status;
       const inFlight = t.status === 'queued' || t.status === 'running';
       row._cancel.style.display = inFlight ? '' : 'none';
-      const undoable = t.status === 'done' && !key.startsWith('x');
+      const undoable = t.status === 'done' && !key.startsWith('x') && t.kind !== 'deploy';
       row._undo.style.display = undoable ? '' : 'none';
+      // re-enable the Build & Deploy button once its task settles
+      if (typeof deployId !== 'undefined' && deployId && key === deployId && ['done', 'error', 'cancelled'].includes(t.status)) resetDeployBtn();
       if (undoable && !undoStack.includes(key)) undoStack.push(key);
       if (t.status === 'reverted') {
         const i = undoStack.indexOf(key);

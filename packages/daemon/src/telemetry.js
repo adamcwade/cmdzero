@@ -53,7 +53,7 @@ export function initTelemetry({ version, tailwind }) {
     saveConfig(config);
   }
   const disabled = telemetryDisabled();
-  const counts = { copy: 0, style: 0, delete: 0, nl: 0, move: 0 };
+  const counts = { copy: 0, style: 0, delete: 0, nl: 0, move: 0, deploy: 0 };
   let flushTimer = null;
 
   function send(event, extra = {}) {

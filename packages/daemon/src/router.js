@@ -274,3 +274,44 @@ export function runClaude({ prompt, model, effort, cwd, onEvent, onSpawn }) {
     onEvent?.({ status: 'running', model });
   });
 }
+
+// "Build & Deploy": run the deploy through headless claude (Bash allowed) so it
+// commits the current tweaks and pushes them to the live site.
+const DEPLOY_PROMPT = `You are deploying this project to production. Using the Bash tool, do exactly this, in order:
+1. Run \`git add -A\`, then commit with a short message describing recent UI tweaks. Do NOT add any AI attribution/co-author trailer. If there is nothing to commit, continue.
+2. If a git remote named "origin" exists, run \`git push\`.
+3. Deploy to production. This is a Vercel project — run: \`vercel --prod --yes\`
+On the FINAL line of your reply, output the production URL exactly as: DEPLOY_URL=<url>
+If any step fails, stop and report the exact error.`;
+
+export function runDeploy({ cwd, model = 'claude-sonnet-5', onEvent, onSpawn }) {
+  return new Promise((resolve) => {
+    const started = Date.now();
+    const args = [
+      '-p', DEPLOY_PROMPT,
+      '--model', model,
+      '--allowedTools', 'Read,Edit,Bash',
+      '--dangerously-skip-permissions', // headless: commit/push/deploy without prompts
+      '--output-format', 'json',
+    ];
+    const child = spawn('claude', args, { cwd, env: { ...process.env, CLAUDE_CODE_ENTRYPOINT: undefined }, detached: true });
+    let cancelled = false;
+    const signalGroup = (sig) => { try { process.kill(-child.pid, sig); } catch { try { child.kill(sig); } catch {} } };
+    child.__cancel = () => { cancelled = true; signalGroup('SIGTERM'); setTimeout(() => { if (!child.killed) signalGroup('SIGKILL'); }, 1500).unref?.(); };
+    onSpawn?.(child);
+    let out = '', err = '';
+    child.stdout.on('data', (d) => (out += d));
+    child.stderr.on('data', (d) => (err += d));
+    child.on('close', (code) => {
+      const durationMs = Date.now() - started;
+      if (cancelled) return resolve({ ok: false, cancelled: true, durationMs });
+      if (code !== 0) return resolve({ ok: false, error: err.trim() || `claude exited ${code}`, durationMs });
+      let result = out;
+      try { result = JSON.parse(out).result || out; } catch { /* raw text */ }
+      const m = /DEPLOY_URL=(\S+)/.exec(result);
+      resolve({ ok: true, durationMs, url: m ? m[1] : null, result: String(result).slice(0, 500) });
+    });
+    child.on('error', (e) => resolve({ ok: false, error: `failed to spawn claude: ${e.message}` }));
+    onEvent?.({ status: 'running' });
+  });
+}
