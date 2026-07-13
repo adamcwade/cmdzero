@@ -43,12 +43,19 @@
   .cz-pop button.cz-primary{background:#6366f1}
   .cz-pop input{flex:1;background:#1f2937;border:1px solid #374151;border-radius:6px;color:#f9fafb;padding:5px 8px;font-size:12px;outline:none}
   .cz-pop select{background:#1f2937;border:1px solid #374151;border-radius:6px;color:#f9fafb;padding:3px 4px;font-size:11.5px;outline:none}
-  .cz-panel{position:fixed;left:12px;top:42px;width:238px;max-height:calc(100vh - 58px);overflow-y:auto;background:#111827;color:#f9fafb;border:1.5px solid #10b981;border-radius:10px;box-shadow:0 8px 30px rgba(0,0,0,.4);padding:9px;pointer-events:auto;display:flex;flex-direction:column;gap:6px;font-size:12px;z-index:2147483100}
+  .cz-panel{position:fixed;left:0;top:30px;bottom:0;width:264px;box-sizing:border-box;overflow-y:auto;background:#0f1523;color:#f9fafb;border-right:1.5px solid #10b981;box-shadow:8px 0 30px rgba(0,0,0,.4);padding:12px 12px 28px;pointer-events:auto;display:flex;flex-direction:column;gap:6px;font-size:12px;z-index:2147483100;transform:translateX(0);transition:transform .26s cubic-bezier(.4,0,.2,1)}
+  .cz-panel.cz-collapsed{transform:translateX(-100%)}
+  .cz-phead{display:flex;align-items:center;justify-content:space-between;gap:8px;padding-bottom:7px;border-bottom:1px solid #1f2937}
+  .cz-min{background:#1f2937;color:#cbd5e1;border:none;border-radius:6px;padding:2px 9px;font-size:14px;line-height:1;cursor:pointer}
+  .cz-min:hover{background:#374151;color:#fff}
+  .cz-ptab{position:fixed;left:0;top:calc(50% + 15px);transform:translateY(-50%);z-index:2147483110;display:none;align-items:center;gap:5px;background:#10b981;color:#052e1b;border:none;border-radius:0 9px 9px 0;padding:13px 6px;cursor:pointer;pointer-events:auto;writing-mode:vertical-rl;font-size:11px;font-weight:700;letter-spacing:.05em;box-shadow:2px 0 10px rgba(0,0,0,.35)}
+  .cz-ptab.cz-show{display:flex}
+  .cz-ptab:hover{background:#34d399}
   .cz-panel .cz-row{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
   .cz-panel button{background:#374151;color:#f9fafb;border:none;border-radius:6px;padding:4px 9px;font-size:12px;cursor:pointer}
   .cz-panel button:hover{background:#4b5563}
   .cz-panel select{background:#1f2937;border:1px solid #374151;border-radius:6px;color:#f9fafb;padding:3px 4px;font-size:11.5px;outline:none}
-  .cz-ptitle{font-family:ui-monospace,monospace;font-size:11px;color:#6ee7b7;padding-bottom:5px;border-bottom:1px solid #1f2937}
+  .cz-ptitle{font-family:ui-monospace,monospace;font-size:11px;color:#6ee7b7;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .cz-sec{color:#94a3b8;font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;margin:5px 0 1px}
   .cz-label{color:#9ca3af;min-width:50px}
   .cz-note{color:#fbbf24;font-size:11px;line-height:1.35;background:rgba(245,158,11,.1);border-radius:6px;padding:4px 7px}
@@ -78,8 +85,8 @@
   .cz-banner .cz-idle{color:#64748b}
   .cz-wrap{display:flex;flex-direction:column;align-items:flex-end;gap:6px}
   .cz-wrap.cz-expanded{max-height:calc(100vh - 90px);overflow-y:auto;overflow-x:hidden;padding:2px}
-  .cz-wrap:not(.cz-expanded) > .cz-tweak:nth-child(n+4){display:none}
-  .cz-fade{height:16px;width:160px;background:linear-gradient(to bottom,rgba(17,24,39,0),rgba(17,24,39,.55));pointer-events:none;margin-top:-10px}
+  .cz-wrap:not(.cz-expanded) > .cz-tweak:nth-last-child(n+4){display:none}
+  .cz-fade{height:14px;width:160px;background:linear-gradient(to top,rgba(17,24,39,0),rgba(17,24,39,.5));pointer-events:none;margin-bottom:-8px}
   .cz-history{background:#0b1220;color:#93c5fd;border:1px solid #263041;border-radius:8px;padding:4px 10px;font-size:11.5px;cursor:pointer;pointer-events:auto;box-shadow:0 4px 14px rgba(0,0,0,.3)}
   .cz-history:hover{border-color:#6366f1}
   .cz-tweak{background:#111827;color:#e5e7eb;border-radius:8px;padding:7px 11px;font-size:13px;display:flex;gap:8px;align-items:center;box-shadow:0 4px 14px rgba(0,0,0,.3);white-space:nowrap;width:max-content;max-width:720px;overflow:hidden;text-overflow:ellipsis}
@@ -110,8 +117,10 @@
     model: 'auto', // NL model override; 'auto' = router picks
     multi: [], // [{ el, loc }] shift-click multi-selection
     autoReload: true, // seamlessly reload after a write so changes always show live
+    panelCollapsed: false, // left style panel minimized to a tab
   };
   try { state.autoReload = localStorage.getItem('cz-autoreload') !== '0'; } catch { /* no storage */ }
+  try { state.panelCollapsed = localStorage.getItem('cz-panel-collapsed') === '1'; } catch { /* no storage */ }
 
   // Stack of undoable tweak ids (LIFO) for ⌘Z / Ctrl-Z global undo.
   const undoStack = [];
@@ -236,11 +245,31 @@
   const pop = el('div', 'cz-pop');
   pop.style.display = 'none';
   root.appendChild(pop);
-  // Left-side style inspector — every style attribute broken out into its own
-  // control, populated by renderPanel() when an element is selected.
-  const panel = el('div', 'cz-panel');
-  panel.style.display = 'none';
+  // Left-side style inspector — a full-height dock that slides in from the left
+  // and pushes the page over (no overlap). Minimizable to a left-edge tab.
+  const PANEL_W = 264;
+  const panel = el('div', 'cz-panel cz-collapsed');
   root.appendChild(panel);
+  const panelTab = el('button', 'cz-ptab');
+  panelTab.innerHTML = '<span>▸</span><span>STYLE</span>';
+  panelTab.title = 'Show style panel';
+  panelTab.onclick = () => setPanelCollapsed(false);
+  root.appendChild(panelTab);
+  try { document.body.style.transition = 'margin-left .26s cubic-bezier(.4,0,.2,1)'; } catch { /* ignore */ }
+
+  function setPanelCollapsed(v) {
+    state.panelCollapsed = v;
+    try { localStorage.setItem('cz-panel-collapsed', v ? '1' : '0'); } catch { /* no storage */ }
+    applyPanelLayout();
+  }
+  // Slide the panel in/out and push the page so nothing is covered.
+  function applyPanelLayout() {
+    const open = !!state.selected && !state.panelCollapsed;
+    panel.classList.toggle('cz-collapsed', !open);
+    panelTab.classList.toggle('cz-show', !!state.selected && state.panelCollapsed);
+    try { document.body.style.marginLeft = open ? PANEL_W + 'px' : '0px'; } catch { /* ignore */ }
+  }
+
   const popLabel = el('div', 'cz-pop-label');
   popLabel.style.display = 'none';
   root.appendChild(popLabel);
@@ -357,7 +386,7 @@
       grip.style.cursor = 'grabbing';
       s.el.style.opacity = '0.45'; // show what's moving
       // hide the panels/popover so they don't block the drop targets
-      pop.style.display = 'none'; panel.style.display = 'none'; popLabel.style.display = 'none';
+      pop.style.display = 'none'; popLabel.style.display = 'none'; // panel is docked left, doesn't block drop targets
     };
 
     const onMove = (ev) => {
@@ -445,7 +474,7 @@
     state.selected = null;
     selBox.style.display = 'none';
     pop.style.display = 'none';
-    panel.style.display = 'none';
+    applyPanelLayout(); // slides the panel out + un-shifts the page
     popLabel.style.display = 'none';
     deleteBtn.style.display = 'none';
     moveBar.style.display = 'none';
@@ -517,10 +546,14 @@
     multiBar._draft = '';
     clearMulti();
     for (const t of targets) {
+      const tempId = 'nl-' + Date.now() + t.loc;
+      addTweak({ id: tempId, status: 'queued', label: `${shortLoc(t.loc)}: ${instruction.slice(0, 40)}` });
       try {
         const r = await api('nl', { loc: t.loc, instruction, model: state.model });
+        removeTweak(tempId);
         addTweak({ id: r.id, status: 'queued', model: r.model, label: `${shortLoc(t.loc)}: ${instruction.slice(0, 40)}` });
       } catch (e) {
+        removeTweak(tempId);
         addTweak({ id: 'x' + Date.now() + t.loc, status: 'error', label: `${shortLoc(t.loc)}: ${e.message}` });
       }
     }
@@ -832,10 +865,16 @@
   // Left inspector panel: every style attribute broken out into its own control.
   function renderPanel() {
     const s = state.selected;
-    if (!s) { panel.style.display = 'none'; return; }
-    panel.style.display = 'flex';
+    applyPanelLayout();
+    if (!s) return;
     panel.textContent = '';
-    panel.appendChild(el('div', 'cz-ptitle', `<${s.el.tagName.toLowerCase()}>  ${shortLoc(s.loc)}${s.instances > 1 ? ` · ${s.instances}×` : ''}`));
+    const head = el('div', 'cz-phead');
+    head.append(el('div', 'cz-ptitle', `<${s.el.tagName.toLowerCase()}>  ${shortLoc(s.loc)}${s.instances > 1 ? ` · ${s.instances}×` : ''}`));
+    const min = el('button', 'cz-min', '‹');
+    min.title = 'Minimize panel';
+    min.onclick = () => setPanelCollapsed(true);
+    head.append(min);
+    panel.appendChild(head);
     const tw = state.tailwind;
 
     panel.appendChild(el('div', 'cz-sec', 'Spacing'));
@@ -927,7 +966,7 @@
 
     const nlWrap = el('div', 'cz-nlwrap');
     const input = el('textarea');
-    input.placeholder = 'Describe a change… (⌘↵ to send)';
+    input.placeholder = 'Describe a change… (↵ to send · ⇧↵ newline)';
     input.rows = 3;
     const go = el('button', 'cz-primary', 'Go →');
     const send = async () => {
@@ -935,16 +974,23 @@
       if (!instruction) return;
       input.value = '';
       input.blur(); // so the reload after the model finishes isn't blocked by focus
+      // Immediate feedback — the server runs the router (which may call the
+      // classifier for ~1-3s) before it broadcasts its own 'queued', so show a
+      // placeholder now and swap in the real task once the request returns.
+      const tempId = 'nl-' + Date.now();
+      addTweak({ id: tempId, status: 'queued', label: instruction.slice(0, 60) });
       try {
         const r = await api('nl', { loc: s.loc, instruction, model: state.model });
+        removeTweak(tempId);
         addTweak({ id: r.id, status: 'queued', model: r.model, label: instruction.slice(0, 60) });
       } catch (e) {
-        addTweak({ id: 'x' + Date.now(), status: 'error', label: e.message });
+        removeTweak(tempId);
+        addTweak({ id: 'x' + Date.now(), status: 'error', label: `${instruction.slice(0, 40)}: ${e.message}` });
       }
     };
     go.onclick = send;
-    // ⌘↵ / Ctrl↵ sends; plain Enter inserts a newline (multi-line prompts).
-    input.onkeydown = (e) => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); send(); } e.stopPropagation(); };
+    // Enter sends; Shift+Enter inserts a newline for multi-line prompts.
+    input.onkeydown = (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); } e.stopPropagation(); };
     const goRow = el('div', 'cz-row');
     goRow.style.justifyContent = 'flex-end';
     goRow.appendChild(go);
@@ -1058,18 +1104,18 @@
   // ---------- tray ----------
   const tray = el('div', 'cz-tray');
   root.appendChild(tray);
-  // Alerts live in their own wrap so history can collapse independently.
-  // Newest is inserted at the top; the 3 newest stay visible (compressed; hover to expand) and older
-  // ones fold behind an expander.
+  // Reads like a log: newest alert sits at the bottom-right corner, older ones
+  // stack upward. The 3 newest stay visible (compressed; hover to expand); the
+  // rest fold behind an expander that sits ABOVE them.
+  const historyChip = el('div', 'cz-history');
+  historyChip.style.display = 'none';
   const tweaksWrap = el('div', 'cz-wrap');
-  tray.appendChild(tweaksWrap);
+  historyChip.onclick = () => { tweaksWrap.classList.toggle('cz-expanded'); updateHistoryUI(); };
+  tray.appendChild(historyChip);
   const fade = el('div', 'cz-fade');
   fade.style.display = 'none';
   tray.appendChild(fade);
-  const historyChip = el('div', 'cz-history');
-  historyChip.style.display = 'none';
-  historyChip.onclick = () => { tweaksWrap.classList.toggle('cz-expanded'); updateHistoryUI(); };
-  tray.appendChild(historyChip);
+  tray.appendChild(tweaksWrap);
   const tweaks = new Map();
   const tweakData = new Map(); // id -> merged record, persisted across reloads
   const HKEY = 'cz-history';
@@ -1125,6 +1171,15 @@
   }
   showTotals(null); // idle banner on load until /api/health arrives
 
+  function removeTweak(id) {
+    const key = String(id);
+    const row = tweaks.get(key);
+    if (row) row.remove();
+    tweaks.delete(key);
+    tweakData.delete(key);
+    updateHistoryUI();
+  }
+
   function addTweak(t, hydrate) {
     const key = String(t.id);
     let row = tweaks.get(key);
@@ -1150,13 +1205,13 @@
         } catch (e) { row._meta.textContent = e.message; }
       };
       row.append(row._dot, row._label, row._meta, row._cancel, row._undo);
-      tweaksWrap.insertBefore(row, tweaksWrap.firstChild);
+      tweaksWrap.appendChild(row); // newest at the end (bottom of the tray)
       tweaks.set(key, row);
       while (tweaksWrap.children.length > MAX_TWEAKS) {
-        const last = tweaksWrap.lastChild;
-        tweaks.delete(last._id);
-        tweakData.delete(last._id);
-        last.remove();
+        const oldest = tweaksWrap.firstChild;
+        tweaks.delete(oldest._id);
+        tweakData.delete(oldest._id);
+        oldest.remove();
       }
     }
     if (t.label) row._label.textContent = t.label;
@@ -1199,7 +1254,7 @@
   (function hydrateTweaks() {
     let saved;
     try { saved = JSON.parse(localStorage.getItem(HKEY) || '[]'); } catch { saved = []; }
-    for (const rec of saved) addTweak(rec, true); // oldest→newest keeps newest on top
+    for (const rec of saved) addTweak(rec, true); // chronological replay → newest ends at the bottom
   })();
 
   try {

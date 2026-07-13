@@ -70,6 +70,9 @@ export function startServer({ root, port = 4100 }) {
     try {
       if (req.method === 'GET' && url.pathname === '/overlay.js') {
         res.setHeader('Content-Type', 'text/javascript');
+        // Never cache the overlay — the daemon is the source of truth, so a
+        // reload always picks up the latest build (no stale-overlay confusion).
+        res.setHeader('Cache-Control', 'no-store, must-revalidate');
         return res.end(fs.readFileSync(OVERLAY_PATH));
       }
 
