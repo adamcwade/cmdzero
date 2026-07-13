@@ -58,8 +58,14 @@
   .cz-swatch{width:18px;height:18px;border-radius:4px;border:1px solid rgba(255,255,255,.25);cursor:pointer;padding:0}
   .cz-swatch:hover{transform:scale(1.15)}
   .cz-chip{font-size:10.5px !important;padding:2px 6px !important}
-  .cz-tray{position:fixed;right:14px;bottom:14px;display:flex;flex-direction:column;align-items:flex-end;gap:6px;pointer-events:auto;transition:transform .28s cubic-bezier(.4,0,.2,1),opacity .22s ease}
-  .cz-tray.cz-dodged{transform:translateX(calc(100% + 28px));opacity:0;pointer-events:none}
+  .cz-tray{position:fixed;right:14px;bottom:14px;display:flex;flex-direction:column;align-items:flex-end;gap:6px;pointer-events:auto}
+  /* Compressed by default (just a dot + short label); hovering the tray expands
+     every alert to full detail with undo/cancel. */
+  .cz-tweak{transition:padding .12s ease}
+  .cz-tray:not(:hover) .cz-tweak{padding:4px 10px;font-size:12px}
+  .cz-tray:not(:hover) .cz-tweak .cz-meta,
+  .cz-tray:not(:hover) .cz-tweak button{display:none}
+  .cz-tray:not(:hover) .cz-tlabel{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:230px;display:inline-block;vertical-align:bottom}
   .cz-banner{position:fixed;top:0;left:0;right:0;height:30px;display:flex;align-items:center;justify-content:space-between;gap:14px;padding:0 14px;background:rgba(9,13,20,.94);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);border-bottom:1px solid #1f2937;color:#cbd5e1;font-size:12px;line-height:1;pointer-events:auto;z-index:2147483200;box-sizing:border-box}
   .cz-banner .cz-brand{display:flex;align-items:center;gap:6px;font-weight:600;color:#e2e8f0;flex:none}
   .cz-banner .cz-brand kbd{background:#10b981;color:#052e1b;border-radius:5px;padding:2px 6px;font-size:10.5px;font-family:ui-monospace,monospace;font-weight:700}
@@ -72,7 +78,7 @@
   .cz-banner .cz-idle{color:#64748b}
   .cz-wrap{display:flex;flex-direction:column;align-items:flex-end;gap:6px}
   .cz-wrap.cz-expanded{max-height:calc(100vh - 90px);overflow-y:auto;overflow-x:hidden;padding:2px}
-  .cz-wrap:not(.cz-expanded) > .cz-tweak:nth-child(n+6){display:none}
+  .cz-wrap:not(.cz-expanded) > .cz-tweak:nth-child(n+4){display:none}
   .cz-fade{height:16px;width:160px;background:linear-gradient(to bottom,rgba(17,24,39,0),rgba(17,24,39,.55));pointer-events:none;margin-top:-10px}
   .cz-history{background:#0b1220;color:#93c5fd;border:1px solid #263041;border-radius:8px;padding:4px 10px;font-size:11.5px;cursor:pointer;pointer-events:auto;box-shadow:0 4px 14px rgba(0,0,0,.3)}
   .cz-history:hover{border-color:#6366f1}
@@ -1038,17 +1044,23 @@
   banner.append(brand, bannerStats, reportLink);
   root.appendChild(banner);
   // Push the page down so the banner sits ABOVE the site rather than over it.
+  // Inject a stylesheet instead of mutating body's style attribute: frameworks
+  // that hydrate (React 19+) diff server-rendered attributes and flag a bare
+  // style mutation as a hydration mismatch.
   try {
     const prevPad = getComputedStyle(document.body).paddingTop;
-    document.body.style.paddingTop = `calc(${prevPad} + 30px)`;
+    const pad = document.createElement('style');
+    pad.setAttribute('data-cz-banner-pad', '');
+    pad.textContent = `body { padding-top: calc(${prevPad} + 30px) !important; }`;
+    document.head.appendChild(pad);
   } catch { /* no body yet */ }
 
   // ---------- tray ----------
   const tray = el('div', 'cz-tray');
   root.appendChild(tray);
   // Alerts live in their own wrap so history can collapse independently.
-  // Newest is inserted at the top; the 5 newest stay visible and
-  // older ones fold behind an expander (fades at the bottom).
+  // Newest is inserted at the top; the 3 newest stay visible (compressed; hover to expand) and older
+  // ones fold behind an expander.
   const tweaksWrap = el('div', 'cz-wrap');
   tray.appendChild(tweaksWrap);
   const fade = el('div', 'cz-fade');
@@ -1066,8 +1078,8 @@
   function updateHistoryUI() {
     const rows = tweaksWrap.children.length;
     const expanded = tweaksWrap.classList.contains('cz-expanded');
-    const hidden = Math.max(0, rows - 5);
-    if (rows <= 5) { historyChip.style.display = 'none'; fade.style.display = 'none'; return; }
+    const hidden = Math.max(0, rows - 3);
+    if (rows <= 3) { historyChip.style.display = 'none'; fade.style.display = 'none'; return; }
     historyChip.style.display = '';
     historyChip.textContent = expanded ? 'collapse ▴' : `＋ ${hidden} older ▾`;
     fade.style.display = expanded ? 'none' : '';
@@ -1120,7 +1132,7 @@
       row = el('div', 'cz-tweak');
       row._id = key;
       row._dot = el('span', 'cz-dot');
-      row._label = el('span', null, '');
+      row._label = el('span', 'cz-tlabel', '');
       row._meta = el('span', 'cz-meta', '');
       row._cancel = el('button', null, 'cancel');
       row._cancel.style.display = 'none';
@@ -1384,28 +1396,6 @@
     else deselect();
   }, true);
 
-  // Alert tray dodges the cursor: when the pointer enters its region, slide it
-  // off to the right so you can click the elements underneath; slide back once
-  // the pointer leaves the original region (hysteresis avoids flicker).
-  let trayDodged = false, trayZone = null;
-  addEventListener('mousemove', (e) => {
-    const x = e.clientX, y = e.clientY;
-    if (!trayDodged) {
-      if (!tweaksWrap.children.length) return; // nothing to dodge
-      const r = tray.getBoundingClientRect();
-      if (r.width && x >= r.left - 8 && x <= r.right + 8 && y >= r.top - 8 && y <= r.bottom + 8) {
-        trayZone = r;
-        trayDodged = true;
-        tray.classList.add('cz-dodged');
-      }
-    } else {
-      const r = trayZone, m = 34;
-      if (!r || x < r.left - m || x > r.right + m || y < r.top - m || y > r.bottom + m) {
-        trayDodged = false;
-        tray.classList.remove('cz-dodged');
-      }
-    }
-  }, true);
 
   addEventListener('scroll', () => { reposition(); positionMulti(); setHover(state.hoverEl); }, true);
   addEventListener('resize', () => { reposition(); positionMulti(); });
