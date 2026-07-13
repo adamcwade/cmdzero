@@ -1110,7 +1110,13 @@
   const historyChip = el('div', 'cz-history');
   historyChip.style.display = 'none';
   const tweaksWrap = el('div', 'cz-wrap');
-  historyChip.onclick = () => { tweaksWrap.classList.toggle('cz-expanded'); updateHistoryUI(); };
+  const pinNewestToBottom = () => { if (tweaksWrap.classList.contains('cz-expanded')) tweaksWrap.scrollTop = tweaksWrap.scrollHeight; };
+  historyChip.onclick = () => {
+    tweaksWrap.classList.toggle('cz-expanded');
+    updateHistoryUI();
+    // when expanded the list scrolls; keep the newest (bottom) in view
+    requestAnimationFrame(pinNewestToBottom);
+  };
   tray.appendChild(historyChip);
   const fade = el('div', 'cz-fade');
   fade.style.display = 'none';
@@ -1248,6 +1254,7 @@
     tweakData.set(key, { ...(tweakData.get(key) || {}), ...t, id: key });
     if (!hydrate) persistTweaks();
     updateHistoryUI();
+    if (!hydrate) pinNewestToBottom(); // keep the newest alert in view when expanded
   }
 
   // Replay saved alerts after a page load so history survives reloads.
