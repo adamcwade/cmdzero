@@ -16,9 +16,22 @@
   #twk-root{position:fixed;inset:0;pointer-events:none;z-index:2147483000;font-family:ui-sans-serif,system-ui,sans-serif}
   .twk-outline{position:fixed;border:1.5px solid #6366f1;border-radius:3px;background:rgba(99,102,241,.08);pointer-events:none;transition:all .04s linear}
   .twk-outline.twk-selected{border-color:#10b981;background:rgba(16,185,129,.06)}
+  .twk-multi{position:fixed;border:1.5px solid #f59e0b;border-radius:3px;background:rgba(245,158,11,.10);pointer-events:none}
+  .twk-multibar{position:fixed;left:50%;bottom:14px;transform:translateX(-50%);background:#111827;color:#f9fafb;border:1.5px solid #f59e0b;border-radius:10px;box-shadow:0 8px 30px rgba(0,0,0,.4);padding:8px;pointer-events:auto;display:flex;gap:6px;align-items:center;font-size:12px;z-index:2147483001}
+  .twk-multibar input{background:#1f2937;border:1px solid #374151;border-radius:6px;color:#f9fafb;padding:5px 8px;font-size:12px;outline:none;width:220px}
+  .twk-multibar button{background:#374151;color:#f9fafb;border:none;border-radius:6px;padding:4px 9px;font-size:12px;cursor:pointer}
+  .twk-multibar button.twk-danger{background:#dc2626}
+  .twk-multibar .twk-count{color:#fbbf24;font-weight:700}
   .twk-badge{position:fixed;background:#312e81;color:#e0e7ff;font-size:11px;padding:2px 7px;border-radius:4px;pointer-events:none;white-space:nowrap;transform:translateY(-100%)}
   .twk-pop-label{position:fixed;background:#10b981;color:#052e1b;font-size:13.8px;font-weight:700;padding:3px 10px;border-radius:8px 8px 0 0;pointer-events:none;white-space:nowrap;transform:translate(-50%,-100%);text-align:center}
   .twk-delete-btn{position:fixed;width:22px;height:22px;border-radius:50%;background:#dc2626;color:#fff;border:none;cursor:pointer;pointer-events:auto;display:flex;align-items:center;justify-content:center;padding:0;box-shadow:0 2px 6px rgba(0,0,0,.4)}
+  .twk-movebar{position:fixed;display:flex;gap:2px;align-items:center;background:#111827;border:1px solid #6366f1;border-radius:7px;padding:2px;pointer-events:auto;box-shadow:0 2px 8px rgba(0,0,0,.45)}
+  .twk-movebar button{width:20px;height:20px;display:flex;align-items:center;justify-content:center;background:#374151;color:#e5e7eb;border:none;border-radius:4px;cursor:pointer;padding:0;font-size:12px;line-height:1}
+  .twk-movebar button:hover{background:#6366f1}
+  .twk-grip{cursor:grab;color:#9ca3af;font-size:13px;padding:0 3px;user-select:none}
+  .twk-grip:active{cursor:grabbing}
+  .twk-drop{position:fixed;background:#6366f1;border-radius:2px;pointer-events:none;z-index:2147483400;box-shadow:0 0 6px rgba(99,102,241,.8)}
+  .twk-dragghost{position:fixed;pointer-events:none;z-index:2147483350;opacity:.5;outline:2px dashed #6366f1;border-radius:4px;background:rgba(99,102,241,.12)}
   .twk-delete-btn:hover{background:#ef4444}
   .twk-delete-btn svg{width:12px;height:12px;pointer-events:none}
   .twk-pop{position:fixed;background:#111827;color:#f9fafb;border:1.5px solid #10b981;border-radius:10px;box-shadow:0 8px 30px rgba(0,0,0,.35);padding:8px;pointer-events:auto;display:flex;flex-direction:column;gap:6px;min-width:300px;max-width:340px;font-size:12px}
@@ -29,12 +42,20 @@
   .twk-pop input{flex:1;background:#1f2937;border:1px solid #374151;border-radius:6px;color:#f9fafb;padding:5px 8px;font-size:12px;outline:none}
   .twk-pop select{background:#1f2937;border:1px solid #374151;border-radius:6px;color:#f9fafb;padding:3px 4px;font-size:11.5px;outline:none}
   .twk-label{color:#9ca3af;min-width:50px}
+  .twk-note{color:#fbbf24;font-size:11px;line-height:1.35;background:rgba(245,158,11,.1);border-radius:6px;padding:4px 7px}
+  .twk-note.twk-info{color:#93c5fd;background:rgba(59,130,246,.12)}
   .twk-cur{color:#6ee7b7;font-size:11px;margin-left:auto}
   .twk-swatches{display:flex;gap:4px;flex-wrap:wrap;max-height:96px;overflow-y:auto;padding:2px}
   .twk-swatch{width:18px;height:18px;border-radius:4px;border:1px solid rgba(255,255,255,.25);cursor:pointer;padding:0}
   .twk-swatch:hover{transform:scale(1.15)}
   .twk-chip{font-size:10.5px !important;padding:2px 6px !important}
   .twk-tray{position:fixed;right:14px;bottom:14px;display:flex;flex-direction:column;align-items:flex-end;gap:6px;pointer-events:auto}
+  .twk-wrap{display:flex;flex-direction:column;align-items:flex-end;gap:6px}
+  .twk-wrap.twk-expanded{max-height:calc(100vh - 90px);overflow-y:auto;overflow-x:hidden;padding:2px}
+  .twk-wrap:not(.twk-expanded) > .twk-tweak:nth-child(n+6){display:none}
+  .twk-fade{height:16px;width:160px;background:linear-gradient(to bottom,rgba(17,24,39,0),rgba(17,24,39,.55));pointer-events:none;margin-top:-10px}
+  .twk-history{background:#0b1220;color:#93c5fd;border:1px solid #263041;border-radius:8px;padding:4px 10px;font-size:11.5px;cursor:pointer;pointer-events:auto;box-shadow:0 4px 14px rgba(0,0,0,.3)}
+  .twk-history:hover{border-color:#6366f1}
   .twk-total{background:#064e3b;color:#a7f3d0;border-radius:8px;padding:6px 11px;font-size:13px;box-shadow:0 4px 14px rgba(0,0,0,.3);white-space:nowrap;width:max-content;max-width:720px}
   .twk-total a{color:#6ee7b7;margin-left:10px;text-decoration:underline;cursor:pointer}
   .twk-total a:hover{color:#a7f3d0}
@@ -44,6 +65,8 @@
   .twk-tweak button{background:none;border:none;color:#818cf8;cursor:pointer;font-size:12.5px;padding:0}
   .twk-meta{color:#9ca3af}
   .twk-hint{position:fixed;left:14px;bottom:14px;background:#111827;color:#9ca3af;font-size:12.5px;padding:6px 11px;border-radius:6px;pointer-events:none}
+  .twk-reload-toggle{position:fixed;left:14px;bottom:46px;background:#111827;color:#6ee7b7;border:1px solid #10b981;font-size:11.5px;padding:4px 9px;border-radius:6px;cursor:pointer;pointer-events:auto}
+  .twk-reload-toggle.off{color:#9ca3af;border-color:#374151}
   [contenteditable="plaintext-only"],[contenteditable="true"]{outline:2px dashed #10b981;outline-offset:2px}
   @keyframes twk-pulse{50%{opacity:.4}}`;
 
@@ -61,7 +84,14 @@
     selected: null, // { el, loc }
     editing: null, // { el, original }
     tailwind: true, // daemon reports whether the app uses Tailwind
+    model: 'auto', // NL model override; 'auto' = router picks
+    multi: [], // [{ el, loc }] shift-click multi-selection
+    autoReload: true, // seamlessly reload after a write so changes always show live
   };
+  try { state.autoReload = localStorage.getItem('twk-autoreload') !== '0'; } catch { /* no storage */ }
+
+  // Stack of undoable tweak ids (LIFO) for ⌘Z / Ctrl-Z global undo.
+  const undoStack = [];
 
   // ---------- helpers ----------
   const el = (tag, cls, text) => {
@@ -192,36 +222,144 @@
   deleteBtn.style.display = 'none';
   deleteBtn.title = 'Delete element';
   root.appendChild(deleteBtn);
+  // All instances of a mapped template share one source stamp; the DOM position
+  // of a given instance tells the daemon WHICH data item it is (list items
+  // render in array order).
+  function instanceIndex(elm, loc) {
+    const instances = [...document.querySelectorAll(`[data-twk="${CSS.escape(loc)}"]`)];
+    const i = instances.indexOf(elm);
+    return i >= 0 ? i : undefined;
+  }
+
+  async function deleteOne({ el: elm, loc }) {
+    const payload = { loc, index: instanceIndex(elm, loc) };
+    // Dry-run first so a refusal never flickers the element.
+    await api('delete', { ...payload, dryRun: true });
+    if (document.contains(elm)) elm.style.display = 'none'; // optimistic; HMR makes it real
+    await api('delete', payload);
+  }
+
   deleteBtn.onclick = async (e) => {
     e.preventDefault();
     e.stopPropagation();
     const sel = state.selected;
     if (!sel || !document.contains(sel.el)) return;
-    // Check first so a refusal never flickers the element or loses the
-    // selection — only hide optimistically once we know it'll succeed.
     deleteBtn.disabled = true;
     try {
-      await api('delete', { loc: sel.loc, dryRun: true });
+      await deleteOne(sel);
     } catch (err) {
+      if (document.contains(sel.el)) sel.el.style.display = '';
       deleteBtn.disabled = false;
-      addTweak({ id: 'x' + Date.now(), status: 'error', label: err.message.slice(0, 140) });
+      addTweak({ id: 'x' + Date.now(), status: 'error', label: `delete: ${err.message.slice(0, 140)}` });
       return;
     }
     deleteBtn.disabled = false;
-    sel.el.style.display = 'none'; // optimistic; HMR makes it real
     deselect();
-    try {
-      await api('delete', { loc: sel.loc });
-    } catch (err) {
-      sel.el.style.display = '';
-      addTweak({ id: 'x' + Date.now(), status: 'error', label: `delete: ${err.message}` });
-    }
   };
+
+  // ---------- reorder / move ----------
+  const moveBar = el('div', 'twk-movebar');
+  const grip = el('span', 'twk-grip', '⠿');
+  grip.title = 'Drag to reorder';
+  const btnPrev = el('button');
+  const btnNext = el('button');
+  moveBar.append(grip, btnPrev, btnNext);
+  moveBar.style.display = 'none';
+  root.appendChild(moveBar);
+
+  // Is this element laid out in a row (reorder ←→) or a column (reorder ↑↓)?
+  function siblingAxis(elm) {
+    const p = elm.parentElement;
+    if (!p) return 'vertical';
+    const cs = getComputedStyle(p);
+    if (cs.display.includes('flex')) return cs.flexDirection.startsWith('row') ? 'horizontal' : 'vertical';
+    if (cs.display.includes('grid')) {
+      // count column tracks — "220px 220px" = 2 cols (a row); "none" = 1
+      const tracks = cs.gridTemplateColumns.split(/\s+/).filter(Boolean);
+      if (tracks.length > 1 && tracks[0] !== 'none') return 'horizontal';
+    }
+    return 'vertical';
+  }
+
+  async function doMove(dir) {
+    const s = state.selected;
+    if (!s || !document.contains(s.el)) return;
+    try {
+      await api('move', { loc: s.loc, dir, index: instanceIndex(s.el, s.loc) });
+      // the reordered source shows via auto-reload / HMR
+    } catch (e) {
+      addTweak({ id: 'x' + Date.now(), status: 'error', label: `move: ${e.message.slice(0, 140)}` });
+    }
+  }
+  btnPrev.onclick = (e) => { e.preventDefault(); e.stopPropagation(); doMove(moveBar._axis === 'horizontal' ? 'left' : 'up'); };
+  btnNext.onclick = (e) => { e.preventDefault(); e.stopPropagation(); doMove(moveBar._axis === 'horizontal' ? 'right' : 'down'); };
+
+  // The peers a drag reorders among, and the dragged element's index in them.
+  function dragPeers(elm, loc) {
+    const instances = [...document.querySelectorAll(`[data-twk="${CSS.escape(loc)}"]`)];
+    if (instances.length > 1 && instances.includes(elm)) return { kind: 'map', peers: instances };
+    const sibs = [...(elm.parentElement?.children || [])].filter((c) => c.nodeType === 1 && c.hasAttribute && c.hasAttribute('data-twk'));
+    return { kind: 'siblings', peers: sibs.length > 1 ? sibs : [elm] };
+  }
+
+  const dropLine = el('div', 'twk-drop');
+  dropLine.style.display = 'none';
+  root.appendChild(dropLine);
+
+  grip.addEventListener('mousedown', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const s = state.selected;
+    if (!s || !document.contains(s.el)) return;
+    const axis = siblingAxis(s.el);
+    const { peers } = dragPeers(s.el, s.loc);
+    if (peers.length < 2) return; // nothing to reorder among
+    const from = peers.indexOf(s.el);
+    let insertIndex = from;
+
+    const onMove = (ev) => {
+      const pos = axis === 'horizontal' ? ev.clientX : ev.clientY;
+      // find insertion slot: before the first peer whose midpoint is past pointer
+      insertIndex = peers.length;
+      for (let i = 0; i < peers.length; i++) {
+        const rr = peers[i].getBoundingClientRect();
+        const mid = axis === 'horizontal' ? rr.left + rr.width / 2 : rr.top + rr.height / 2;
+        if (pos < mid) { insertIndex = i; break; }
+      }
+      // draw the drop indicator at that gap
+      const ref = peers[Math.min(insertIndex, peers.length - 1)].getBoundingClientRect();
+      dropLine.style.display = 'block';
+      if (axis === 'horizontal') {
+        const x = insertIndex >= peers.length ? ref.right : ref.left;
+        Object.assign(dropLine.style, { left: x - 1 + 'px', top: ref.top + 'px', width: '3px', height: ref.height + 'px' });
+      } else {
+        const y = insertIndex >= peers.length ? ref.bottom : ref.top;
+        Object.assign(dropLine.style, { left: ref.left + 'px', top: y - 1 + 'px', width: ref.width + 'px', height: '3px' });
+      }
+    };
+    const onUp = async () => {
+      removeEventListener('mousemove', onMove, true);
+      removeEventListener('mouseup', onUp, true);
+      dropLine.style.display = 'none';
+      const finalIndex = insertIndex > from ? insertIndex - 1 : insertIndex;
+      if (finalIndex === from || finalIndex < 0) return;
+      try {
+        await api('move', { loc: s.loc, index: instanceIndex(s.el, s.loc), toIndex: finalIndex });
+      } catch (err) {
+        addTweak({ id: 'x' + Date.now(), status: 'error', label: `move: ${err.message.slice(0, 140)}` });
+      }
+    };
+    addEventListener('mousemove', onMove, true);
+    addEventListener('mouseup', onUp, true);
+  });
 
   function select(target) {
     finishTextEdit(false);
     const loc = target.getAttribute('data-twk');
-    state.selected = { el: target, loc, meta: null };
+    // How many rendered elements map to this same source line — i.e. how many
+    // instances a shared-source edit (style/functionality) will change.
+    const instances = document.querySelectorAll(`[data-twk="${CSS.escape(loc)}"]`).length;
+    state.selected = { el: target, loc, meta: null, instances };
     selBox.style.display = 'block';
     renderPopover();
     reposition();
@@ -250,6 +388,98 @@
     pop.style.display = 'none';
     popLabel.style.display = 'none';
     deleteBtn.style.display = 'none';
+    moveBar.style.display = 'none';
+  }
+
+  // ---------- multi-select (shift-click) ----------
+  const multiBoxes = []; // pooled outline divs
+  const multiBar = el('div', 'twk-multibar');
+  multiBar.style.display = 'none';
+  root.appendChild(multiBar);
+
+  function toggleMulti(target) {
+    const loc = target.getAttribute('data-twk');
+    const i = state.multi.findIndex((m) => m.el === target);
+    if (i >= 0) state.multi.splice(i, 1);
+    else {
+      // leaving single-selection mode: fold the current single selection in too
+      if (state.selected && !state.multi.some((m) => m.el === state.selected.el)) {
+        state.multi.push({ el: state.selected.el, loc: state.selected.loc });
+      }
+      if (!state.multi.some((m) => m.el === target)) state.multi.push({ el: target, loc });
+      deselect();
+    }
+    renderMulti();
+  }
+
+  function clearMulti() {
+    state.multi = [];
+    renderMulti();
+  }
+
+  function positionMulti() {
+    state.multi.forEach((m, i) => {
+      if (!multiBoxes[i]) { multiBoxes[i] = el('div', 'twk-multi'); root.appendChild(multiBoxes[i]); }
+      const box = multiBoxes[i];
+      if (!document.contains(m.el)) { box.style.display = 'none'; return; }
+      box.style.display = 'block';
+      positionBox(box, m.el);
+    });
+    for (let i = state.multi.length; i < multiBoxes.length; i++) multiBoxes[i].style.display = 'none';
+  }
+
+  let multiInput;
+  function renderMulti() {
+    positionMulti();
+    if (!state.multi.length) { multiBar.style.display = 'none'; return; }
+    multiBar.style.display = 'flex';
+    multiBar.textContent = '';
+    multiBar.append(el('span', 'twk-count', String(state.multi.length)));
+    multiBar.append(el('span', null, 'selected'));
+    multiInput = el('input');
+    multiInput.placeholder = 'Describe a change for all…';
+    multiInput.value = multiBar._draft || '';
+    multiInput.oninput = () => { multiBar._draft = multiInput.value; };
+    multiInput.onkeydown = (e) => { if (e.key === 'Enter') applyMultiNL(); e.stopPropagation(); };
+    const apply = el('button', 'twk-primary', 'Apply');
+    apply.onclick = applyMultiNL;
+    const del = el('button', 'twk-danger', 'Delete all');
+    del.onclick = deleteMulti;
+    const clear = el('button', null, 'Clear');
+    clear.onclick = clearMulti;
+    multiBar.append(multiInput, apply, del, clear);
+  }
+
+  async function applyMultiNL() {
+    const instruction = (multiInput?.value || '').trim();
+    if (!instruction) return;
+    const targets = state.multi.slice();
+    multiBar._draft = '';
+    clearMulti();
+    for (const t of targets) {
+      try {
+        const r = await api('nl', { loc: t.loc, instruction, model: state.model });
+        addTweak({ id: r.id, status: 'queued', model: r.model, label: `${shortLoc(t.loc)}: ${instruction.slice(0, 40)}` });
+      } catch (e) {
+        addTweak({ id: 'x' + Date.now() + t.loc, status: 'error', label: `${shortLoc(t.loc)}: ${e.message}` });
+      }
+    }
+  }
+
+  async function deleteMulti() {
+    const targets = state.multi.slice();
+    clearMulti();
+    // Delete bottom-up so a mapped-list removal doesn't shift the index of a
+    // not-yet-deleted sibling in the same list.
+    targets.sort((a, b) => (instanceIndex(b.el, b.loc) ?? 0) - (instanceIndex(a.el, a.loc) ?? 0));
+    for (const t of targets) {
+      try {
+        await deleteOne(t);
+      } catch (e) {
+        if (document.contains(t.el)) t.el.style.display = '';
+        addTweak({ id: 'x' + Date.now() + t.loc, status: 'error', label: `delete ${shortLoc(t.loc)}: ${e.message}` });
+      }
+    }
   }
 
   function reposition() {
@@ -268,7 +498,7 @@
     const left = Math.min(Math.max(r.left, 8), innerWidth - 356);
     Object.assign(pop.style, { left: left + 'px', top: Math.max(top, 8 + labelH) + 'px' });
     popLabel.style.display = 'block';
-    popLabel.textContent = shortLoc(s.loc);
+    popLabel.textContent = s.instances > 1 ? `${shortLoc(s.loc)} · ${s.instances}×` : shortLoc(s.loc);
     Object.assign(popLabel.style, { left: (left + pop.offsetWidth / 2) + 'px', top: pop.style.top });
     deleteBtn.style.display = 'flex';
     const inset = 4;
@@ -276,6 +506,15 @@
       left: r.right - 22 - inset + 'px',
       top: r.top + inset + 'px',
     });
+    // Move toolbar: top-left of the selection, arrows matching the layout axis.
+    const axis = siblingAxis(s.el);
+    moveBar._axis = axis;
+    btnPrev.textContent = axis === 'horizontal' ? '←' : '↑';
+    btnNext.textContent = axis === 'horizontal' ? '→' : '↓';
+    btnPrev.title = axis === 'horizontal' ? 'Move left' : 'Move up';
+    btnNext.title = axis === 'horizontal' ? 'Move right' : 'Move down';
+    moveBar.style.display = 'flex';
+    Object.assign(moveBar.style, { left: r.left + inset + 'px', top: r.top + inset + 'px' });
   }
 
   // ---------- class tweaks ----------
@@ -322,12 +561,25 @@
   function fontStep(target, dir) {
     const scale = readTheme().textSizes;
     const classes = classList(target);
+    // An arbitrary size like `text-[34px]` also sets font-size and would
+    // override the scale class we add — remove it too, and seed the step from
+    // the element's rendered px so the first bump goes the right direction.
+    const arbitrary = classes.filter((c) => /^text-\[[^\]]+\]$/.test(c));
     const cur = classes.find((c) => scale.includes(c));
-    let idx = cur ? scale.indexOf(cur) : scale.indexOf('text-base');
+    let idx;
+    if (cur) idx = scale.indexOf(cur);
+    else {
+      const px = parseFloat(getComputedStyle(target).fontSize) || 16;
+      // nearest scale entry by rendered size, else middle
+      idx = scale.indexOf('text-base');
+      if (idx < 0) idx = Math.floor(scale.length / 2);
+    }
     if (idx < 0) idx = Math.floor(scale.length / 2);
     const next = Math.min(Math.max(idx + dir, 0), scale.length - 1);
-    if (scale[next] === cur) return null;
-    return { remove: cur ? [cur] : [], add: [scale[next]] };
+    const add = scale[next];
+    const remove = [...(cur ? [cur] : []), ...arbitrary];
+    if (add === cur && !arbitrary.length) return null;
+    return { remove, add: [add] };
   }
 
   // Property editor: which classes to strip when setting each property.
@@ -481,11 +733,24 @@
 
     // location now lives in the green tab above the panel (popLabel)
 
+    // Reused component: this source line renders in >1 place, so style and
+    // functionality edits (which change the shared source) apply everywhere.
+    // Copy is the exception — it must stay on this one instance (below).
+    const shared = s.instances > 1;
+    if (shared) {
+      pop.appendChild(el('div', 'twk-note twk-info', `Reused component — ${s.instances} instances. Style & functionality changes apply to all of them.`));
+    }
+
     // Copy lane, driven by the SOURCE text literals (s.meta.texts), not the
     // DOM: animation libs split text into spans and expressions render as
     // text, so DOM shape says nothing about what's editable in the JSX.
     const literals = s.meta ? s.meta.texts : null;
-    if (literals && literals.length) {
+    if (shared && literals && literals.length) {
+      // The text literal is shared by every instance, so editing it here would
+      // change all of them — which is not what a copy edit should do. Keep copy
+      // local: block the in-place edit and point to the per-instance route.
+      pop.appendChild(el('div', 'twk-note', 'Copy here is shared across all instances — editing it would change every one. To change just this instance, make its text a prop/data value (describe it below and it\'ll route through the model).'));
+    } else if (literals && literals.length) {
       // In-place editing only when the single literal IS the element's whole
       // text (animation-split DOM still qualifies — same text, different
       // nodes). Partial literals (mixed with {expressions}) get input fields
@@ -608,14 +873,15 @@
 
     const nlRow = el('div', 'twk-row');
     const input = el('input');
-    input.placeholder = 'Describe a change… (routed to the right model)';
+    input.placeholder = 'Describe a change…';
     const go = el('button', 'twk-primary', 'Go');
     const send = async () => {
       const instruction = input.value.trim();
       if (!instruction) return;
       input.value = '';
+      input.blur(); // so the reload after the model finishes isn't blocked by focus
       try {
-        const r = await api('nl', { loc: s.loc, instruction });
+        const r = await api('nl', { loc: s.loc, instruction, model: state.model });
         addTweak({ id: r.id, status: 'queued', model: r.model, label: instruction.slice(0, 60) });
       } catch (e) {
         addTweak({ id: 'x' + Date.now(), status: 'error', label: e.message });
@@ -625,6 +891,20 @@
     input.onkeydown = (e) => { if (e.key === 'Enter') send(); e.stopPropagation(); };
     nlRow.append(input, go);
     pop.appendChild(nlRow);
+
+    // Model picker: Auto (router) or a forced tier.
+    const modelRow = el('div', 'twk-row');
+    modelRow.append(el('span', 'twk-label', 'Model'));
+    const modelSel = el('select');
+    for (const [label, value] of [['Auto (routed)', 'auto'], ['Sonnet', 'claude-sonnet-5'], ['Opus', 'claude-opus-4-8'], ['Fable', 'claude-fable-5']]) {
+      const o = el('option', null, label);
+      o.value = value;
+      if (value === state.model) o.selected = true;
+      modelSel.appendChild(o);
+    }
+    modelSel.onchange = () => { state.model = modelSel.value; };
+    modelRow.append(modelSel);
+    pop.appendChild(modelRow);
     // delete lives as a floating icon on the element itself (deleteBtn)
   }
 
@@ -693,7 +973,42 @@
   reportLink.rel = 'noopener';
   totalBar.append(totalText, reportLink);
   tray.appendChild(totalBar);
+  // Alerts live in their own wrap so history can collapse independently of the
+  // savings bar. Newest is inserted at the top; the 5 newest stay visible and
+  // older ones fold behind an expander (fades at the bottom).
+  const tweaksWrap = el('div', 'twk-wrap');
+  tray.appendChild(tweaksWrap);
+  const fade = el('div', 'twk-fade');
+  fade.style.display = 'none';
+  tray.appendChild(fade);
+  const historyChip = el('div', 'twk-history');
+  historyChip.style.display = 'none';
+  historyChip.onclick = () => { tweaksWrap.classList.toggle('twk-expanded'); updateHistoryUI(); };
+  tray.appendChild(historyChip);
   const tweaks = new Map();
+  const tweakData = new Map(); // id -> merged record, persisted across reloads
+  const HKEY = 'twk-history';
+  const MAX_TWEAKS = 40;
+
+  function updateHistoryUI() {
+    const rows = tweaksWrap.children.length;
+    const expanded = tweaksWrap.classList.contains('twk-expanded');
+    const hidden = Math.max(0, rows - 5);
+    if (rows <= 5) { historyChip.style.display = 'none'; fade.style.display = 'none'; return; }
+    historyChip.style.display = '';
+    historyChip.textContent = expanded ? 'collapse ▴' : `＋ ${hidden} older ▾`;
+    fade.style.display = expanded ? 'none' : '';
+  }
+
+  function persistTweaks() {
+    try {
+      const arr = [...tweakData.values()].slice(-MAX_TWEAKS).map((r) => ({
+        id: r.id, label: r.label, status: r.status, model: r.model, effort: r.effort,
+        kind: r.kind, tokens: r.tokens, durationMs: r.durationMs, costUSD: r.costUSD, error: r.error,
+      }));
+      localStorage.setItem(HKEY, JSON.stringify(arr));
+    } catch { /* no storage */ }
+  }
 
   function showTotals(t) {
     if (!t || !t.count) return;
@@ -701,10 +1016,12 @@
     totalText.textContent = `≈ saved $${t.usd.toFixed(2)} · ${Math.round(t.ms / 1000)}s across ${t.count} tweak${t.count === 1 ? '' : 's'} (vs unscoped agent)`;
   }
 
-  function addTweak(t) {
-    let row = tweaks.get(String(t.id));
+  function addTweak(t, hydrate) {
+    const key = String(t.id);
+    let row = tweaks.get(key);
     if (!row) {
       row = el('div', 'twk-tweak');
+      row._id = key;
       row._dot = el('span', 'twk-dot');
       row._label = el('span', null, '');
       row._meta = el('span', 'twk-meta', '');
@@ -719,21 +1036,39 @@
       row._undo.style.display = 'none';
       row._undo.onclick = async () => {
         try {
-          await api('undo', { id: t.id });
+          await api('undo', { id: row._id });
           setTimeout(reposition, 350);
         } catch (e) { row._meta.textContent = e.message; }
       };
       row.append(row._dot, row._label, row._meta, row._cancel, row._undo);
-      tray.insertBefore(row, totalBar.nextSibling);
-      tweaks.set(String(t.id), row);
-      while (tray.children.length > 7) tray.lastChild.remove();
+      tweaksWrap.insertBefore(row, tweaksWrap.firstChild);
+      tweaks.set(key, row);
+      while (tweaksWrap.children.length > MAX_TWEAKS) {
+        const last = tweaksWrap.lastChild;
+        tweaks.delete(last._id);
+        tweakData.delete(last._id);
+        last.remove();
+      }
     }
     if (t.label) row._label.textContent = t.label;
     if (t.status) {
       row._dot.className = 'twk-dot ' + t.status;
       const inFlight = t.status === 'queued' || t.status === 'running';
       row._cancel.style.display = inFlight ? '' : 'none';
-      row._undo.style.display = t.status === 'done' && !String(t.id).startsWith('x') ? '' : 'none';
+      const undoable = t.status === 'done' && !key.startsWith('x');
+      row._undo.style.display = undoable ? '' : 'none';
+      if (undoable && !undoStack.includes(key)) undoStack.push(key);
+      if (t.status === 'reverted') {
+        const i = undoStack.indexOf(key);
+        if (i >= 0) undoStack.splice(i, 1);
+      }
+      // Only reload when the edit isn't already reflected instantly: model (nl)
+      // requests and reorders have no optimistic preview, so pull the live view
+      // in sync. Copy/style/delete apply immediately (optimistic + HMR) — no
+      // reload. Undo (revert) reloads so the reversal always shows. Never during
+      // hydration (replaying saved alerts after a load).
+      const needsReload = (undoable && (!!t.model || t.kind === 'move')) || t.status === 'reverted';
+      if (needsReload && !hydrate) scheduleReload();
     }
     const bits = [];
     if (t.model) bits.push(t.model.replace(/^claude-/, '') + (t.effort ? ` @ ${t.effort}` : ''));
@@ -744,7 +1079,19 @@
     if (t.error) bits.push(t.error.slice(0, 80));
     if (bits.length) row._meta.textContent = bits.join(' · ');
     if (t.totals) showTotals(t.totals);
+
+    // merge into the persisted record set (skip re-persisting during hydration)
+    tweakData.set(key, { ...(tweakData.get(key) || {}), ...t, id: key });
+    if (!hydrate) persistTweaks();
+    updateHistoryUI();
   }
+
+  // Replay saved alerts after a page load so history survives reloads.
+  (function hydrateTweaks() {
+    let saved;
+    try { saved = JSON.parse(localStorage.getItem(HKEY) || '[]'); } catch { saved = []; }
+    for (const rec of saved) addTweak(rec, true); // oldest→newest keeps newest on top
+  })();
 
   try {
     const es = new EventSource(`${ORIGIN}/api/events`);
@@ -762,15 +1109,114 @@
     })
     .catch(() => {});
 
+  // ---------- auto-reload ----------
+  // HMR/Fast Refresh reflects most edits live, but not all (module-scope
+  // consts, some structural/model edits). To guarantee changes always show
+  // without a manual refresh, do a seamless reload after a write settles —
+  // debounced, and preserving scroll + select mode + the current selection.
+  const RKEY = 'twk-reload-state';
+  let reloadTimer = null;
+  function scheduleReload() {
+    if (!state.autoReload) return;
+    clearTimeout(reloadTimer);
+    reloadTimer = setTimeout(doReload, 650);
+  }
+  function doReload() {
+    // never interrupt an in-progress copy edit, multi-select, or typing into a
+    // text field (the app's or the overlay's own NL box) — wait and retry.
+    const ae = document.activeElement;
+    const typing = ae && (ae.isContentEditable || /^(INPUT|TEXTAREA)$/.test(ae.tagName));
+    if (state.editing || state.multi.length || typing) {
+      reloadTimer = setTimeout(doReload, 650);
+      return;
+    }
+    try {
+      // Only for THIS reload: stop the browser from also restoring scroll and
+      // fighting ours. Not set globally (that interfered with the app's own
+      // scroll handling and caused idle scroll jitter).
+      history.scrollRestoration = 'manual';
+    } catch { /* older browsers */ }
+    try {
+      sessionStorage.setItem(RKEY, JSON.stringify({ scrollX: scrollX, scrollY: scrollY, selectMode: state.selectMode, loc: state.selected?.loc || null }));
+    } catch { /* no storage — reload anyway */ }
+    location.reload();
+  }
+
+  // Restore scroll + selection after an auto-reload so it feels seamless.
+  function restoreAfterReload() {
+    let saved;
+    try { saved = JSON.parse(sessionStorage.getItem(RKEY) || 'null'); } catch { saved = null; }
+    if (!saved) return; // normal load — leave the browser's scroll handling alone
+    try { sessionStorage.removeItem(RKEY); } catch { /* ignore */ }
+    // Re-apply scroll a few times as the app hydrates, then hand control back
+    // to the browser so we never linger and fight the app's scrolling.
+    const y = saved.scrollY || 0, x = saved.scrollX || 0;
+    let tries = 12;
+    (function pin() {
+      scrollTo(x, y);
+      if (tries-- > 0 && Math.abs(scrollY - y) > 2) setTimeout(pin, 30);
+      else { try { history.scrollRestoration = 'auto'; } catch { /* ignore */ } }
+    })();
+    if (saved.selectMode) setMode(true);
+    if (saved.loc) {
+      const again = document.querySelector(`[data-twk="${CSS.escape(saved.loc)}"]`);
+      if (again) select(again);
+    }
+  }
+  if (document.readyState === 'complete') restoreAfterReload();
+  else addEventListener('load', restoreAfterReload);
+
   // ---------- mode + events ----------
   const hint = el('div', 'twk-hint', '⌘. select mode');
   root.appendChild(hint);
 
+  const reloadToggle = el('button', 'twk-reload-toggle');
+  const syncReloadToggle = () => {
+    reloadToggle.textContent = state.autoReload ? '⟳ auto-reload on' : '⟳ auto-reload off';
+    reloadToggle.classList.toggle('off', !state.autoReload);
+    reloadToggle.title = 'Reload the page automatically after each change so it always shows live';
+  };
+  reloadToggle.onclick = () => {
+    state.autoReload = !state.autoReload;
+    try { localStorage.setItem('twk-autoreload', state.autoReload ? '1' : '0'); } catch { /* no storage */ }
+    syncReloadToggle();
+  };
+  syncReloadToggle();
+  root.appendChild(reloadToggle);
+
   function setMode(on) {
     state.selectMode = on;
-    hint.textContent = on ? 'select mode — click an element · Esc to exit' : '⌘. select mode';
-    if (!on) { setHover(null); deselect(); }
+    hint.textContent = on ? 'select mode — click · shift-click multi · Tab next · ⌘Z undo · Esc exit' : '⌘. select mode';
+    if (!on) { setHover(null); deselect(); clearMulti(); }
   }
+
+  // Visible, stamped elements in document order — the Tab cycle.
+  function stampedEls() {
+    return [...document.querySelectorAll('[data-twk]')].filter((n) => n.getClientRects().length);
+  }
+  function selectNext(dir) {
+    const els = stampedEls();
+    if (!els.length) return;
+    const cur = state.selected?.el;
+    let idx = cur ? els.indexOf(cur) : -1;
+    idx = (idx + dir + els.length) % els.length;
+    const next = els[idx];
+    select(next);
+    next.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  }
+
+  async function undoLast() {
+    const id = undoStack.pop();
+    if (id == null) return;
+    try {
+      await api('undo', { id });
+      setTimeout(reposition, 350);
+    } catch { /* already reverted / unknown — drop it */ }
+  }
+
+  // ⌘Z / Ctrl-Z should still do native undo inside inputs and while editing copy.
+  const inTextField = (t) =>
+    t instanceof Element && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName));
 
   addEventListener('keydown', (e) => {
     if ((e.metaKey || e.ctrlKey) && e.key === '.') {
@@ -778,11 +1224,25 @@
       setMode(!state.selectMode);
       return;
     }
+    // Global undo (works whenever the overlay is active, not just in select
+    // mode) — but never hijack undo inside a text field or mid copy-edit.
+    if ((e.metaKey || e.ctrlKey) && (e.key === 'z' || e.key === 'Z') && !e.shiftKey) {
+      if (state.editing || inTextField(e.target)) return;
+      e.preventDefault();
+      undoLast();
+      return;
+    }
     if (!state.selectMode) return;
     if (e.key === 'Escape') {
       if (state.editing) return finishTextEdit(false);
+      if (state.multi.length) return clearMulti();
       if (state.selected) return deselect();
       return setMode(false);
+    }
+    if (e.key === 'Tab' && !state.editing) {
+      e.preventDefault();
+      selectNext(e.shiftKey ? -1 : 1);
+      return;
     }
     if (e.key === 'Enter' && state.editing) {
       e.preventDefault();
@@ -812,10 +1272,13 @@
     e.preventDefault();
     e.stopPropagation();
     const target = e.target instanceof Element ? e.target.closest('[data-twk]') : null;
+    // Shift-click toggles an element in the multi-selection set.
+    if (target && e.shiftKey) return toggleMulti(target);
+    if (state.multi.length) clearMulti();
     if (target) select(target);
     else deselect();
   }, true);
 
-  addEventListener('scroll', () => { reposition(); setHover(state.hoverEl); }, true);
-  addEventListener('resize', () => reposition());
+  addEventListener('scroll', () => { reposition(); positionMulti(); setHover(state.hoverEl); }, true);
+  addEventListener('resize', () => { reposition(); positionMulti(); });
 })();

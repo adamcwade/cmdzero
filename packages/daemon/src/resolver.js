@@ -90,30 +90,106 @@ export function applyTextEdit(root, loc, oldText, newText) {
   return writeChecked(abs, content, next);
 }
 
+// Rebuild a template-literal className, editing only the STATIC class tokens
+// and keeping every `${...}` expression verbatim. Returns the `...` source.
+function rebuildTemplateClasses(content, expr, removes, adds) {
+  const SENT = '\u0000';
+  const parts = [];
+  expr.quasis.forEach((q, i) => {
+    parts.push(q.value.raw);
+    if (i < expr.expressions.length) parts.push(SENT);
+  });
+  let tokens = parts
+    .join('')
+    .split(/\s+/)
+    .filter(Boolean)
+    .flatMap((t) => {
+      if (!t.includes(SENT)) return [t];
+      const out = [];
+      t.split(SENT).forEach((seg, i, a) => { if (seg) out.push(seg); if (i < a.length - 1) out.push(SENT); });
+      return out;
+    });
+  tokens = tokens.filter((t) => t === SENT || !removes.includes(t));
+  for (const a of adds) if (!tokens.includes(a)) tokens.push(a);
+  let ei = 0;
+  const rebuilt = tokens
+    .map((t) => (t === SENT ? '${' + content.slice(expr.expressions[ei].start, expr.expressions[ei++].end) + '}' : t))
+    .join(' ');
+  return '`' + rebuilt + '`';
+}
+
+// Resolve a local `const name = "..."` (or template) referenced by
+// className={name}. Returns the string/template literal node, or null.
+function resolveClassConst(ast, name) {
+  let found = null;
+  walk(ast, (n) => {
+    if (found) return;
+    if (n.type === 'VariableDeclarator' && n.id?.type === 'Identifier' && n.id.name === name) {
+      const init = unwrapExpr(n.init);
+      if (init && (init.type === 'StringLiteral' || init.type === 'TemplateLiteral')) found = init;
+    }
+  });
+  return found;
+}
+
+// The literal node we can actually edit for a className attribute — the
+// attribute's own string/template, or the `const` it references.
+function classValueNode(ast, attr) {
+  const v = attr.value;
+  if (v && v.type === 'StringLiteral') return v;
+  const expr = v && v.type === 'JSXExpressionContainer' ? v.expression : null;
+  if (!expr) return null;
+  if (expr.type === 'StringLiteral' || expr.type === 'TemplateLiteral') return expr;
+  if (expr.type === 'Identifier') return resolveClassConst(ast, expr.name);
+  return null;
+}
+
 export function applyClassEdit(root, loc, removes = [], adds = []) {
-  const { abs, content, element } = loadTarget(root, loc);
+  const { abs, content, element, ast } = loadTarget(root, loc);
   const opening = element.openingElement;
-  const attr = opening.attributes.find(
-    (a) =>
-      a.type === 'JSXAttribute' &&
-      a.name.name === 'className' &&
-      a.value &&
-      a.value.type === 'StringLiteral'
+  const classAttrs = opening.attributes.filter(
+    (a) => a.type === 'JSXAttribute' && a.name.name === 'className'
   );
-  let next;
-  if (attr) {
-    let classes = attr.value.value.split(/\s+/).filter(Boolean);
-    classes = classes.filter((c) => !removes.includes(c));
+
+  const editList = (list) => {
+    let classes = list.split(/\s+/).filter(Boolean).filter((c) => !removes.includes(c));
     for (const a of adds) if (!classes.includes(a)) classes.push(a);
-    next =
-      content.slice(0, attr.value.start + 1) +
-      classes.join(' ') +
-      content.slice(attr.value.end - 1);
-  } else {
+    return classes.join(' ');
+  };
+
+  // No className yet — add a fresh string attribute.
+  if (!classAttrs.length) {
     const pos = opening.name.end;
-    next =
-      content.slice(0, pos) + ` className="${adds.join(' ')}"` + content.slice(pos);
+    return writeChecked(abs, content, content.slice(0, pos) + ` className="${adds.join(' ')}"` + content.slice(pos));
   }
+
+  // When an element has DUPLICATE className attributes (a corruption the old
+  // class editor could introduce), React renders only the LAST one. Edit that
+  // effective className, and strip the earlier dead duplicates so the element
+  // ends up valid and single-className.
+  const attr = classAttrs[classAttrs.length - 1];
+  const node = classValueNode(ast, attr);
+  if (!node) {
+    throw new Error(
+      "className here is computed, so I can't edit its classes deterministically. Use the size/color controls (inline style) or describe the change to route it through the model."
+    );
+  }
+
+  const replacement =
+    node.type === 'TemplateLiteral'
+      ? rebuildTemplateClasses(content, node, removes, adds)
+      : JSON.stringify(editList(node.value));
+
+  // Apply the value replacement plus removal of each dead duplicate attribute
+  // (with its leading space), right-to-left so offsets stay valid.
+  const edits = [{ start: node.start, end: node.end, text: replacement }];
+  for (const d of classAttrs.slice(0, -1)) {
+    const start = content[d.start - 1] === ' ' ? d.start - 1 : d.start;
+    edits.push({ start, end: d.end, text: '' });
+  }
+  edits.sort((a, b) => b.start - a.start);
+  let next = content;
+  for (const e of edits) next = next.slice(0, e.start) + e.text + next.slice(e.end);
   return writeChecked(abs, content, next);
 }
 
@@ -255,16 +331,17 @@ function nameOfFunction(ast, fn) {
 
 // Walk up from the element looking for a `{...}` JSX expression whose whole
 // removal parses — covers `{cond && <el/>}` (conditional) and `{arr.map(...)}`
-// (list template: removing it removes the rendered list). Never crosses a
-// function boundary except an inline callback (a function that is itself a
-// call argument, e.g. the .map render callback).
+// (list template). Never crosses a function boundary except an inline callback
+// (a function that is itself a call argument, e.g. the .map render callback).
+// For lists, also returns the map CallExpression so the caller can target the
+// underlying data array instead of the whole list.
 function removableExpressionContainer(chain) {
   for (let i = 1; i < chain.length; i++) {
     const node = chain[i];
     if (node.type === 'JSXExpressionContainer') {
       const inner = chain[i - 1];
       const isList = FN_TYPES.has(inner?.type) || inner?.type === 'CallExpression';
-      return { container: node, kind: isList ? 'list' : 'conditional block' };
+      return { container: node, kind: isList ? 'list' : 'conditional block', mapCall: isList ? inner : null };
     }
     if (FN_TYPES.has(node.type)) {
       // crossing a function is only allowed for inline callbacks (map etc.)
@@ -273,6 +350,68 @@ function removableExpressionContainer(chain) {
     }
   }
   return null;
+}
+
+// Unwrap TS wrappers around an initializer (as const / satisfies / parens).
+function unwrapExpr(node) {
+  let n = node;
+  while (n && (n.type === 'TSAsExpression' || n.type === 'TSSatisfiesExpression' || n.type === 'TSNonNullExpression' || n.type === 'ParenthesizedExpression'))
+    n = n.expression;
+  return n;
+}
+
+// For `{items.map(cb)}`: resolve `items` to a local `const items = [...]`
+// ArrayExpression in the same file. Returns the array node or null.
+function resolveMappedArray(ast, mapCall) {
+  let call = mapCall;
+  // chain may have handed us the arrow (expression-body case) — find the call
+  if (call && FN_TYPES.has(call.type)) return null; // caller passes the real call below
+  if (!call || call.type !== 'CallExpression') return null;
+  const callee = call.callee;
+  if (
+    callee?.type !== 'MemberExpression' ||
+    callee.property?.type !== 'Identifier' ||
+    !['map', 'flatMap'].includes(callee.property.name) ||
+    callee.object?.type !== 'Identifier'
+  ) return null;
+  const arrName = callee.object.name;
+  let arr = null;
+  walk(ast, (n) => {
+    if (arr) return;
+    if (n.type === 'VariableDeclarator' && n.id?.type === 'Identifier' && n.id.name === arrName) {
+      const init = unwrapExpr(n.init);
+      if (init?.type === 'ArrayExpression') arr = init;
+    }
+  });
+  return arr;
+}
+
+// Remove the k-th element of an ArrayExpression, handling commas and whole
+// lines. Returns new content, or null if the result doesn't parse.
+function removeArrayElement(content, arrayNode, k, file) {
+  const el = arrayNode.elements[k];
+  if (!el) return null;
+  let start = el.start;
+  let end = el.end;
+  const after = content.slice(end).match(/^\s*,/);
+  if (after) end += after[0].length;
+  else {
+    const before = content.slice(0, start).match(/,\s*$/);
+    if (before) start -= before[0].length;
+  }
+  const lineStart = content.lastIndexOf('\n', start - 1) + 1;
+  const trailing = content.slice(end).match(/^[ \t]*\n/);
+  if (/^[ \t]*$/.test(content.slice(lineStart, start)) && trailing) {
+    start = lineStart;
+    end += trailing[0].length;
+  }
+  const next = content.slice(0, start) + content.slice(end);
+  try {
+    parseSource(next, file);
+    return next;
+  } catch {
+    return null;
+  }
 }
 
 // Walk the project for JSX usages of <Name ...>. Returns [{file, element}].
@@ -309,15 +448,16 @@ function findUsages(root, name) {
 /**
  * Delete behavior, in order:
  *  1. Normal element (has siblings): remove it in place.
- *  2. Element inside a `{...}` JSX expression whose removal parses — a list
- *     template (`{arr.map(...)}`) or a conditional (`{cond && <el/>}`):
- *     remove the whole expression. Deleting a list template removes the
- *     rendered list — that's what the on-screen "container" is.
- *  3. Sole return of a NAMED component used in exactly one place: remove that
+ *  2. List template (`{arr.map(...)}`): the clicked DOM instance's `index`
+ *     identifies the data item — remove that ONE entry from the local array
+ *     literal. Deleting one card removes one card, not the list. (To remove a
+ *     whole list, select its surrounding wrapper element instead.)
+ *  3. Conditional (`{cond && <el/>}`): remove the whole conditional block.
+ *  4. Sole return of a NAMED component used in exactly one place: remove that
  *     usage at its call site.
  *  Otherwise refuse with an actionable message (ambiguous → model lane).
  */
-export function applyDeleteElement(root, loc, { dryRun = false } = {}) {
+export function applyDeleteElement(root, loc, { dryRun = false, index } = {}) {
   // reuse loadTarget's AST — element identity must hold for the ancestor walk
   const { abs, content, element, file, ast } = loadTarget(root, loc);
 
@@ -331,6 +471,22 @@ export function applyDeleteElement(root, loc, { dryRun = false } = {}) {
   const chain = ancestorChain(ast, element);
 
   const wrapper = removableExpressionContainer(chain);
+  if (wrapper && wrapper.kind === 'list') {
+    const arr = resolveMappedArray(ast, wrapper.mapCall);
+    if (arr && Number.isInteger(index) && index >= 0 && index < arr.elements.length) {
+      const next = removeArrayElement(content, arr, index, file);
+      if (next !== null) {
+        const detail = `item ${index + 1} of ${arr.elements.length}`;
+        if (dryRun) return { abs, before: content, after: next, wouldWrite: false, removedBlock: detail };
+        return { ...writeChecked(abs, content, next), removedBlock: detail };
+      }
+    }
+    // data not editable deterministically (imported/computed array, or the
+    // instance index is unknown) — never silently delete the whole list
+    throw new Error(
+      "this is one item in a rendered list whose data I can't safely edit here. Describe the change (e.g. \"remove the second stat\") and it'll route through the model — or select the list's surrounding container to delete the whole list."
+    );
+  }
   if (wrapper) {
     const next = removeElementFromContent(content, wrapper.container, file);
     if (next !== null) {
@@ -372,6 +528,153 @@ export function applyDeleteElement(root, loc, { dryRun = false } = {}) {
   }
   if (dryRun) return { abs: usage.abs, before: usage.content, after: removed, wouldWrite: false, removedUsage: name };
   return { ...writeChecked(usage.abs, usage.content, removed), removedUsage: name };
+}
+
+// ---------- reorder / move ----------
+
+const DIR_STEP = { up: -1, left: -1, prev: -1, down: 1, right: 1, next: 1 };
+
+// The JSX-element siblings of `element` (elements sharing its parent), plus the
+// index of `element` among them. Only when the parent is itself JSX.
+function jsxElementSiblings(ast, element) {
+  const chain = ancestorChain(ast, element);
+  const parent = chain[1];
+  if (!parent || (parent.type !== 'JSXElement' && parent.type !== 'JSXFragment')) return null;
+  const list = (parent.children || []).filter((c) => c.type === 'JSXElement');
+  const pos = list.findIndex((n) => n.start === element.start && n.end === element.end);
+  if (pos < 0) return null;
+  return { list, pos };
+}
+
+// The full source block of a node: its own span, extended to swallow the
+// leading indent on its line and one trailing newline, so a moved element
+// carries its own line(s) cleanly.
+function nodeBlock(content, node) {
+  let start = node.start;
+  let end = node.end;
+  const lineStart = content.lastIndexOf('\n', start - 1) + 1;
+  if (/^[ \t]*$/.test(content.slice(lineStart, start))) start = lineStart;
+  const after = content.slice(end).match(/^[ \t]*\n/);
+  if (after) end += after[0].length;
+  return { start, end, text: content.slice(start, end) };
+}
+
+// Move sibling nodes[from] to position `to` by cutting its line-block and
+// re-inserting it before/after the anchor. Returns new content, or null if it
+// doesn't parse.
+function moveNode(content, siblings, from, to, file) {
+  if (from === to || to < 0 || to >= siblings.length) return null;
+  const block = nodeBlock(content, siblings[from]);
+  const removedLen = block.end - block.start;
+  const without = content.slice(0, block.start) + content.slice(block.end);
+  const adj = (p) => (p > block.start ? p - removedLen : p);
+  const anchor = siblings[to];
+  const aBlock = nodeBlock(without, { start: adj(anchor.start), end: adj(anchor.end) });
+  const insertAt = to > from ? aBlock.end : aBlock.start;
+  const next = without.slice(0, insertAt) + block.text + without.slice(insertAt);
+  try { parseSource(next, file); return next; } catch { return null; }
+}
+
+// Reorder the elements of an array literal, preserving inline vs. multiline
+// formatting. Returns new content, or null if it doesn't parse.
+function moveArrayElement(content, arr, from, to, file) {
+  const els = arr.elements;
+  if (from === to || from < 0 || to < 0 || from >= els.length || to >= els.length) return null;
+  const texts = els.map((n) => content.slice(n.start, n.end));
+  const [m] = texts.splice(from, 1);
+  texts.splice(to, 0, m);
+  const first = els[0], last = els[els.length - 1];
+  const interior = content.slice(first.start, last.end);
+  let joined;
+  if (interior.includes('\n')) {
+    const ls = content.lastIndexOf('\n', first.start - 1) + 1;
+    const indent = content.slice(ls, first.start).match(/^\s*/)[0];
+    joined = texts.join(',\n' + indent);
+  } else {
+    joined = texts.join(', ');
+  }
+  const next = content.slice(0, first.start) + joined + content.slice(last.end);
+  try { parseSource(next, file); return next; } catch { return null; }
+}
+
+// The name a file's default export renders as (`export default function Hero`).
+function defaultExportName(ast) {
+  let name = null;
+  walk(ast, (n) => {
+    if (name || n.type !== 'ExportDefaultDeclaration') return;
+    const d = n.declaration;
+    if (d.type === 'FunctionDeclaration' && d.id) name = d.id.name;
+    else if (d.type === 'Identifier') name = d.name;
+  });
+  return name;
+}
+
+/**
+ * Reorder the selected element among its siblings.
+ *  - map item (`{arr.map(...)}`)      → reorder the backing array literal
+ *  - JSX-element siblings in the file → move the element among them
+ *  - otherwise (section root)         → move THIS file's component usage
+ *    (`<Hero/>`) among its siblings in the importing file (e.g. page.tsx)
+ * `dir` is up/down/left/right (prev/next); `toIndex` gives an absolute target
+ * (drag). `index` is the clicked instance index for mapped items.
+ */
+export function applyMove(root, loc, { dir, index, toIndex, dryRun = false } = {}) {
+  const { abs, content, element, file, ast } = loadTarget(root, loc);
+  const step = DIR_STEP[dir] ?? 1;
+  const finish = (writeAbs, before, after, detail) => {
+    if (after == null) throw new Error(detail || "can't move this the way you dragged it.");
+    if (dryRun) return { abs: writeAbs, before, after, wouldWrite: false, moved: detail };
+    return { ...writeChecked(writeAbs, before, after), moved: detail };
+  };
+
+  const chain = ancestorChain(ast, element);
+
+  // Case B: one item of a rendered list → reorder the data array.
+  const wrapper = removableExpressionContainer(chain);
+  if (wrapper && wrapper.kind === 'list') {
+    const arr = resolveMappedArray(ast, wrapper.mapCall);
+    if (!arr) throw new Error("this list's data isn't a local array I can safely reorder here.");
+    const from = Number.isInteger(index) ? index : 0;
+    const to = toIndex != null ? toIndex : from + step;
+    if (to < 0 || to >= arr.elements.length) throw new Error('already at the end of the list.');
+    const next = moveArrayElement(content, arr, from, to, file);
+    return finish(abs, content, next, `item ${from + 1} → ${to + 1} of ${arr.elements.length}`);
+  }
+
+  // Case A: JSX-element siblings in this same file.
+  const sib = jsxElementSiblings(ast, element);
+  if (sib && sib.list.length > 1) {
+    const from = sib.pos;
+    const to = toIndex != null ? toIndex : from + step;
+    if (to < 0 || to >= sib.list.length) throw new Error('already at the edge — nothing to swap with.');
+    const next = moveNode(content, sib.list, from, to, file);
+    return finish(abs, content, next, `${from + 1} → ${to + 1} of ${sib.list.length}`);
+  }
+
+  // Case C: no movable siblings here — treat it as a section and move THIS
+  // file's component usage among its siblings in the importing file.
+  const name = defaultExportName(ast) || nameOfFunction(ast, returningFunction(chain));
+  if (!name || !/^[A-Z]/.test(name)) {
+    throw new Error("there's nothing to reorder here — this element has no movable siblings. Select the section's outer container (or a card in a row).");
+  }
+  const usages = findUsages(root, name);
+  if (usages.length === 0) throw new Error(`can't find where <${name}> is placed, so there's no section order to change.`);
+  if (usages.length > 1) throw new Error(`<${name}> is used in ${usages.length} places — reordering is ambiguous.`);
+  const u = usages[0];
+  const uAst = parseSource(u.content, u.file);
+  let uEl = null;
+  walk(uAst, (n) => {
+    if (uEl || n.type !== 'JSXElement') return;
+    const nm = n.openingElement.name;
+    if (nm.type === 'JSXIdentifier' && nm.name === name && n.start === u.element.start) uEl = n;
+  });
+  const usib = uEl && jsxElementSiblings(uAst, uEl);
+  if (!usib || usib.list.length < 2) throw new Error(`<${name}> has no sibling sections to reorder with.`);
+  const from = usib.pos;
+  const to = toIndex != null ? toIndex : from + step;
+  if (to < 0 || to >= usib.list.length) throw new Error(`<${name}> is already at the ${step < 0 ? 'top' : 'bottom'}.`);
+  const next = moveNode(u.content, usib.list, from, to, u.file);
+  return finish(u.abs, u.content, next, `${name}: section ${from + 1} → ${to + 1} of ${usib.list.length}`);
 }
 
 /** Returns null if the file parses, else the parse error message. */

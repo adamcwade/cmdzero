@@ -4,7 +4,10 @@ Tweak your UI live in the browser — the changes are written straight to your s
 
 - **Copy**: click any text, edit in place, Enter. Written to the JSX literal. 0 tokens.
 - **Style**: padding/margin per side, font sizes and colors from *your* design system tokens. Deterministic Tailwind class edits. 0 tokens.
+- **Reorder**: every selected section/card gets a move toolbar — arrows (`↑↓` for columns, `←→` for rows) or drag the `⠿` grip. Cards in a `.map()` reorder the backing array; written-out siblings swap in place; a section's outer container moves the whole `<Section/>` among its siblings in the page. 0 tokens.
 - **Anything else**: describe it — a layered router picks a model *and* an effort level sized to the request, then runs headless `claude -p` scoped to the exact file your selection maps to.
+
+Changes show live automatically — the overlay reloads the page (preserving scroll + selection) after a write settles, so HMR gaps (module-scope consts, structural edits) never need a manual refresh. Toggle it bottom-left.
 
 ## Model routing
 

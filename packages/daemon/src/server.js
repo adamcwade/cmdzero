@@ -2,7 +2,7 @@ import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { describeTarget, applyTextEdit, applyClassEdit, applyStyleEdit, applyDeleteElement, parseLoc, checkSyntax } from './resolver.js';
+import { describeTarget, applyTextEdit, applyClassEdit, applyStyleEdit, applyDeleteElement, applyMove, parseLoc, checkSyntax } from './resolver.js';
 import { classify, buildPrompt, runClaude } from './router.js';
 import { initTelemetry, DISCLOSURE } from './telemetry.js';
 
@@ -128,12 +128,12 @@ export function startServer({ root, port = 4100 }) {
 
         if (url.pathname === '/api/delete') {
           if (body.dryRun) {
-            applyDeleteElement(root, body.loc, { dryRun: true }); // throws if unsafe, writes nothing
+            applyDeleteElement(root, body.loc, { dryRun: true, index: body.index }); // throws if unsafe, writes nothing
             return json(res, { ok: true, dryRun: true });
           }
           const id = nextId++;
           const target = describeTarget(root, body.loc);
-          const write = applyDeleteElement(root, body.loc);
+          const write = applyDeleteElement(root, body.loc, { index: body.index });
           remember(id, write);
           telemetry.record('delete');
           const label = write.removedUsage
@@ -142,6 +142,19 @@ export function startServer({ root, port = 4100 }) {
               ? `deleted ${write.removedBlock}`
               : `deleted <${target.tagName}>`;
           broadcast({ type: 'tweak', id, kind: 'delete', status: 'done', tokens: 0, label, ...recordSavings(0, 50) });
+          return json(res, { ok: true, id });
+        }
+
+        if (url.pathname === '/api/move') {
+          if (body.dryRun) {
+            applyMove(root, body.loc, { dir: body.dir, index: body.index, toIndex: body.toIndex, dryRun: true });
+            return json(res, { ok: true, dryRun: true });
+          }
+          const id = nextId++;
+          const write = applyMove(root, body.loc, { dir: body.dir, index: body.index, toIndex: body.toIndex });
+          remember(id, write);
+          telemetry.record('move');
+          broadcast({ type: 'tweak', id, kind: 'move', status: 'done', tokens: 0, label: `moved ${write.moved}`, ...recordSavings(0, 50) });
           return json(res, { ok: true, id });
         }
 
@@ -173,6 +186,12 @@ export function startServer({ root, port = 4100 }) {
           const { file } = parseLoc(body.loc);
           const target = describeTarget(root, body.loc);
           const route = await classify(body.instruction, { cwd: root });
+          // Manual model override from the picker: keep the router's effort/tier
+          // (still sized to the request) but force the model the user chose.
+          if (body.model && body.model !== 'auto') {
+            route.model = body.model;
+            route.tier = 'manual';
+          }
           const abs = path.resolve(root, file);
           remember(id, { abs, before: fs.readFileSync(abs, 'utf8') });
           telemetry.record('nl');
