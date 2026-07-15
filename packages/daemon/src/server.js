@@ -2,7 +2,7 @@ import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { describeTarget, applyTextEdit, applyClassEdit, applyStyleEdit, applyDeleteElement, applyMove, parseLoc, checkSyntax } from './resolver.js';
+import { describeTarget, applyTextEdit, applyPropTextEdit, applyClassEdit, applyStyleEdit, applyDeleteElement, applyMove, parseLoc, checkSyntax } from './resolver.js';
 import { classify, buildPrompt, runClaude, runDeploy } from './router.js';
 import { initTelemetry, DISCLOSURE } from './telemetry.js';
 
@@ -126,7 +126,18 @@ export function startServer({ root, port = 4100, heartbeatMs = 15000 }) {
         const body = await readJson(req);
 
         if (url.pathname === '/api/resolve') {
-          return json(res, describeTarget(root, body.loc));
+          // ancestors let the daemon tell two call sites of the same component
+          // apart — without them, every <RevealWords> heading looks identical.
+          return json(res, describeTarget(root, body.loc, { ancestors: body.ancestors || [] }));
+        }
+
+        if (url.pathname === '/api/edit-prop') {
+          const id = nextId++;
+          const write = applyPropTextEdit(root, body.loc, body.prop, body.oldText, body.newText);
+          remember(id, write);
+          telemetry.record('copy');
+          broadcast({ type: 'tweak', id, kind: 'copy', status: 'done', tokens: 0, label: `copy: "${body.newText.slice(0, 40)}"`, ...recordSavings(0, 50) });
+          return json(res, { ok: true, id });
         }
 
         if (url.pathname === '/api/edit-text') {

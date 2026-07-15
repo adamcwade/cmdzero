@@ -502,7 +502,7 @@
     const s = state.selected;
     if (!s) return;
     try {
-      const meta = await api('resolve', { loc: s.loc });
+      const meta = await api('resolve', { loc: s.loc, ancestors: ancestorStamps(s.el) });
       if (state.selected !== s) return; // selection changed meanwhile
       s.meta = meta;
       renderPopover();
@@ -1067,33 +1067,75 @@
   // literal we can edit in place (headings, buttons, links, paragraphs — not
   // containers, and not text shared across multiple instances).
   function canEditWholeText(s) {
-    const lits = s?.meta?.texts;
+    if (!s || !document.contains(s.el)) return false;
+    // Text traced to a call site's prop: the ancestors already picked out which
+    // usage this is, so several instances of the shared component are fine —
+    // the edit lands on this one's data, not on the component they share.
+    const src = s.meta?.textSource;
+    if (src) return !!textHost(s.el, src);
+    const lits = s.meta?.texts;
     if (!lits || lits.length !== 1 || s.instances > 1) return false;
-    return document.contains(s.el) && lits[0].value.trim() === s.el.textContent.trim();
+    return normText(lits[0].value) === normText(s.el.textContent);
+  }
+
+  // Rendered text and source text never match byte for byte: HTML collapses
+  // runs of whitespace, JSX literals wrap across lines, and a word-splitting
+  // animation may join with non-breaking spaces the source spells as plain ones.
+  // Compare what a reader sees, not what the file holds.
+  const normText = (s) => (s || '').replace(/\s+/g, ' ').trim();
+
+  // The element that displays the whole traced string. A reveal animation
+  // renders a span per word, so the span you clicked holds "something." while
+  // the sentence lives a level or two up — that ancestor is what gets edited.
+  function textHost(el, src) {
+    const want = normText(src.value);
+    if (!src.wholeText) return normText(el.textContent) === want ? el : null;
+    for (let p = el; p; p = p.parentElement) {
+      if (normText(p.textContent) === want) return p;
+    }
+    return null;
+  }
+
+  // The stamps above this element, nearest first. The daemon needs them to tell
+  // which call site rendered a shared component's markup.
+  function ancestorStamps(el) {
+    const out = [];
+    for (let p = el?.parentElement; p; p = p.parentElement) {
+      const cz = p.getAttribute('data-cz');
+      if (cz) out.push(cz);
+    }
+    return out;
   }
 
   function startTextEdit(selectAll = true) {
     const s = state.selected;
     // the popover can outlive its selection (HMR, reloads) — never throw
-    const literal = s?.meta?.texts?.[0]?.value;
-    if (literal == null || !document.contains(s.el)) return;
-    if (state.editing && state.editing.el === s.el) return; // already editing this one
+    const source = s?.meta?.textSource || null;
+    const literal = source ? source.value : s?.meta?.texts?.[0]?.value;
+    if (literal == null || !s || !document.contains(s.el)) return;
+    // For traced text the element holding the sentence may be an ancestor of the
+    // one clicked — edit that, or a reveal's per-word spans would each try to
+    // hold the whole heading.
+    const host = source ? textHost(s.el, source) : s.el;
+    if (!host) return;
+    if (state.editing && state.editing.el === host) return; // already editing this one
     const frag = document.createDocumentFragment();
-    while (s.el.firstChild) frag.appendChild(s.el.firstChild);
+    while (host.firstChild) frag.appendChild(host.firstChild);
     state.editing = {
-      el: s.el,
+      el: host,
       loc: s.loc,
+      source, // set when the text lives in a call site's prop rather than here
       literal,
       frag,
-      prevUserSelect: s.el.style.userSelect,
+      prevUserSelect: host.style.userSelect,
     };
-    s.el.textContent = literal;
-    s.el.style.userSelect = 'text'; // buttons often have user-select: none
-    try { s.el.contentEditable = 'plaintext-only'; } catch { s.el.contentEditable = 'true'; }
-    s.el.focus({ preventScroll: true });
+    host.textContent = literal;
+    host.style.userSelect = 'text'; // buttons often have user-select: none
+    try { host.contentEditable = 'plaintext-only'; } catch { host.contentEditable = 'true'; }
+    host.focus({ preventScroll: true });
     const sel = document.getSelection();
-    if (selectAll) sel?.selectAllChildren(s.el);
-    else { const rng = document.createRange(); rng.selectNodeContents(s.el); rng.collapse(false); sel?.removeAllRanges(); sel?.addRange(rng); }
+    if (selectAll) sel?.selectAllChildren(host);
+    else { const rng = document.createRange(); rng.selectNodeContents(host); rng.collapse(false); sel?.removeAllRanges(); sel?.addRange(rng); }
     hint.textContent = 'editing text — type to change · ⌘0 or click another element saves · Esc cancels';
   }
 
@@ -1114,7 +1156,18 @@
       return;
     }
     try {
-      await api('edit-text', { loc: ed.loc, oldText: ed.literal, newText });
+      if (ed.source) {
+        // The string belongs to this call site, not to the component whose
+        // markup we clicked — writing there would retitle every usage at once.
+        await api('edit-prop', {
+          loc: ed.source.loc,
+          prop: ed.source.prop,
+          oldText: ed.literal,
+          newText,
+        });
+      } else {
+        await api('edit-text', { loc: ed.loc, oldText: ed.literal, newText });
+      }
       // keep the new text; HMR re-renders the component (animations included)
     } catch (e) {
       restore();

@@ -64,12 +64,192 @@ export function loadTarget(root, loc) {
   return { file, abs, content, element, ast };
 }
 
-export function describeTarget(root, loc) {
-  const { file, content, element } = loadTarget(root, loc);
+/** The nearest enclosing function whose name looks like a component. */
+function enclosingComponent(ast, chain) {
+  for (const node of chain) {
+    if (!FN_TYPES.has(node.type)) continue;
+    const name = nameOfFunction(ast, node);
+    if (name && /^[A-Z]/.test(name)) return { fn: node, name };
+  }
+  return null;
+}
+
+/** Is `name` destructured out of the component's props? ({ text, as }) => ... */
+function isDestructuredProp(fn, name) {
+  const param = fn?.params?.[0];
+  if (param?.type !== 'ObjectPattern') return false;
+  return param.properties.some(
+    (p) => p.type === 'ObjectProperty' && p.key?.type === 'Identifier' && p.key.name === name
+  );
+}
+
+/** The `{ident}` an element renders as its only child, if that's its shape. */
+function soleExpressionIdentifier(element) {
+  const meaningful = element.children.filter(
+    (c) => !(c.type === 'JSXText' && !c.value.trim())
+  );
+  if (meaningful.length !== 1) return null;
+  const only = meaningful[0];
+  if (only.type !== 'JSXExpressionContainer') return null;
+  const expr = unwrapExpr(only.expression);
+  return expr?.type === 'Identifier' ? expr.name : null;
+}
+
+function usageLoc(usage) {
+  const s = usage.element.openingElement.loc.start;
+  return `${usage.file}:${s.line}:${s.column}`;
+}
+
+/** `words.map(cb)` → "words" */
+function mapCallArrayName(node) {
+  const call = unwrapExpr(node);
+  if (call?.type !== 'CallExpression') return null;
+  const callee = call.callee;
+  if (
+    callee?.type !== 'MemberExpression' ||
+    callee.property?.type !== 'Identifier' ||
+    !['map', 'flatMap'].includes(callee.property.name) ||
+    callee.object?.type !== 'Identifier'
+  ) return null;
+  return callee.object.name;
+}
+
+/** `const words = text.split(" ")` → "text" */
+function splitSourceOf(ast, arrName) {
+  let prop = null;
+  walk(ast, (n) => {
+    if (prop) return;
+    if (n.type !== 'VariableDeclarator' || n.id?.type !== 'Identifier' || n.id.name !== arrName) return;
+    const init = unwrapExpr(n.init);
+    if (
+      init?.type === 'CallExpression' &&
+      init.callee?.type === 'MemberExpression' &&
+      init.callee.property?.type === 'Identifier' &&
+      init.callee.property.name === 'split' &&
+      init.callee.object?.type === 'Identifier'
+    ) prop = init.callee.object.name;
+  });
+  return prop;
+}
+
+/**
+ * Text reached one hop indirectly: a reveal animation splits a prop into a span
+ * per word, so the span you can actually click renders {word}, not {text}. The
+ * word isn't addressable in the source — the sentence is — so the editable unit
+ * is the whole prop either way.
+ *
+ * Covers the wrapper that renders {words.map(...)} and any element sitting
+ * inside the map callback.
+ */
+function splitMappedProp(ast, chain, element) {
+  const meaningful = element.children.filter((c) => !(c.type === 'JSXText' && !c.value.trim()));
+  if (meaningful.length === 1 && meaningful[0].type === 'JSXExpressionContainer') {
+    const arrName = mapCallArrayName(meaningful[0].expression);
+    if (arrName) {
+      const prop = splitSourceOf(ast, arrName);
+      if (prop) return prop;
+    }
+  }
+  for (const node of chain) {
+    const arrName = mapCallArrayName(node);
+    if (!arrName) continue;
+    const prop = splitSourceOf(ast, arrName);
+    if (prop) return prop;
+  }
+  return null;
+}
+
+/**
+ * Text is data: `<RevealWords text="..."/>` renders {text} inside a span that
+ * lives in Reveal.tsx, so every heading stamps as that same span. Editing there
+ * rewrites the shared component and changes the copy under every call site at
+ * once — the string belongs to the call site's prop.
+ *
+ * The stamp can't say which call site rendered this element, so the overlay
+ * sends the clicked node's ancestor stamps. The nearest one from another file is
+ * the call site; look the component up there. Two usages in that file and we
+ * genuinely cannot tell which heading was clicked, so say so rather than rewrite
+ * the wrong one.
+ */
+function traceTextProp(root, { file, ast, chain, element }, ancestors = []) {
+  const component = enclosingComponent(ast, chain);
+  if (!component) return { source: null, note: null };
+
+  // {text} straight from the prop, or {word} one hop through split/map — the
+  // latter can only be rewritten a sentence at a time.
+  let propName = null;
+  let wholeText = false;
+  const direct = soleExpressionIdentifier(element);
+  if (direct && isDestructuredProp(component.fn, direct)) {
+    propName = direct;
+  } else {
+    const mapped = splitMappedProp(ast, chain, element);
+    if (mapped && isDestructuredProp(component.fn, mapped)) {
+      propName = mapped;
+      wholeText = true;
+    }
+  }
+  if (!propName) return { source: null, note: null };
+
+  // Nearest ancestor first; the element's own file is the component, not a call site.
+  const seen = new Set();
+  for (const stamp of ancestors) {
+    let candidate;
+    try { candidate = parseLoc(stamp).file; } catch { continue; }
+    candidate = path.isAbsolute(candidate) ? path.relative(root, candidate) : candidate;
+    if (candidate === file || seen.has(candidate)) continue;
+    seen.add(candidate);
+
+    const here = findUsages(root, component.name).filter((u) => u.file === candidate);
+    if (here.length === 0) continue;
+    if (here.length > 1) {
+      return {
+        source: null,
+        note: `this text comes from <${component.name}>'s ${propName} prop, but ${candidate} has ${here.length} usages — I can't tell which one you clicked. Select the heading itself, or describe the change.`,
+      };
+    }
+
+    const attr = here[0].element.openingElement.attributes.find(
+      (a) =>
+        a.type === 'JSXAttribute' &&
+        a.name.name === propName &&
+        a.value?.type === 'StringLiteral'
+    );
+    if (!attr) {
+      return {
+        source: null,
+        note: `<${component.name}> in ${candidate} passes ${propName} as an expression, not a plain string, so there's no literal to edit here.`,
+      };
+    }
+    return {
+      source: {
+        file: candidate,
+        loc: usageLoc(here[0]),
+        component: component.name,
+        prop: propName,
+        value: attr.value.value,
+        // The clicked element shows a slice of this string (one word of a
+        // reveal), so the edit replaces the whole sentence. The overlay uses
+        // this to edit the element that actually holds all of it.
+        wholeText,
+      },
+      note: null,
+    };
+  }
+  return { source: null, note: null };
+}
+
+export function describeTarget(root, loc, { ancestors = [] } = {}) {
+  const { file, content, element, ast } = loadTarget(root, loc);
   const opening = element.openingElement;
   const texts = element.children
     .filter((c) => c.type === 'JSXText' && c.value.trim())
     .map((c) => ({ value: c.value.trim(), start: c.start, end: c.end }));
+
+  // Only trace when there's no literal of our own to edit.
+  const traced = texts.length === 0
+    ? traceTextProp(root, { file, ast, chain: ancestorChain(ast, element), element }, ancestors)
+    : { source: null, note: null };
   const classAttr = opening.attributes.find(
     (a) =>
       a.type === 'JSXAttribute' &&
@@ -84,8 +264,34 @@ export function describeTarget(root, loc) {
     lines: { start: element.loc.start.line, end: element.loc.end.line },
     snippet: content.slice(element.start, element.end),
     texts,
+    // Where this element's text really lives, when it renders a prop rather than
+    // a literal of its own. Null when it has its own text, or when the call site
+    // can't be pinned down (textSourceNote says why).
+    textSource: traced.source,
+    textSourceNote: traced.note,
     className: classAttr ? classAttr.value.value : null,
   };
+}
+
+/**
+ * Rewrite a string prop at a call site: `<RevealWords text="old"/>` → "new".
+ * This is the write half of traceTextProp — the edit lands on the call site's
+ * data, so sibling usages of the same component keep their own copy.
+ */
+export function applyPropTextEdit(root, loc, prop, oldText, newText) {
+  const { abs, content, element } = loadTarget(root, loc);
+  const attr = element.openingElement.attributes.find(
+    (a) => a.type === 'JSXAttribute' && a.name.name === prop && a.value?.type === 'StringLiteral'
+  );
+  if (!attr) throw new Error(`no string ${prop} prop to edit at ${loc}`);
+  if (oldText != null && attr.value.value !== oldText) {
+    throw new Error(`${prop} has changed since it was read — reload and try again`);
+  }
+  // A JSX attribute string is not a JS string: backslash escapes don't apply,
+  // entities do. Escape the two characters that would end or reopen it.
+  const escaped = newText.replace(/&/g, '&amp;').replace(/"/g, '&quot;');
+  const next = content.slice(0, attr.value.start) + `"${escaped}"` + content.slice(attr.value.end);
+  return writeChecked(abs, content, next);
 }
 
 export function applyTextEdit(root, loc, oldText, newText) {
