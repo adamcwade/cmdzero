@@ -12,3 +12,9 @@ dist/
 
 # build artifacts
 *.tgz
+
+# secrets — .env.example is the only one that may be committed
+.env
+.env.*
+!.env.example
+.vercel/
