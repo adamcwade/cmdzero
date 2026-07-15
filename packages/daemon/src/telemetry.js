@@ -9,9 +9,13 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 
 const ENDPOINT =
-  process.env.CMDZERO_TELEMETRY_URL || 'https://telemetry.cmdzero.dev/v1/events';
+  process.env.CMDZERO_TELEMETRY_URL || 'https://telemetry.cmdzero.xyz/v1/events';
 const CONFIG_PATH = path.join(os.homedir(), '.cmdzero', 'telemetry.json');
 const FLUSH_MS = 60_000;
+// Off by default: this runs in other people's dev terminals, and telemetry that
+// complains about itself is worse than telemetry that fails. Delivery status is
+// always readable via /api/health regardless of this flag.
+const DEBUG = process.env.CMDZERO_TELEMETRY_DEBUG === '1';
 
 export function telemetryDisabled() {
   const v = String(process.env.CMDZERO_TELEMETRY ?? '').toLowerCase();
@@ -55,6 +59,19 @@ export function initTelemetry({ version, tailwind }) {
   const disabled = telemetryDisabled();
   const counts = { copy: 0, style: 0, delete: 0, nl: 0, move: 0, deploy: 0 };
   let flushTimer = null;
+  let lastSentAt = null;
+  let lastError = null;
+
+  // Must never throw: it runs inside the promise handlers below.
+  function note(what, err) {
+    if (!err) {
+      lastSentAt = new Date().toISOString();
+      lastError = null;
+      return;
+    }
+    lastError = { at: new Date().toISOString(), message: `${what}: ${err}` };
+    if (DEBUG) console.error(`[cmdzero] telemetry ${what} failed: ${err}`);
+  }
 
   function send(event, extra = {}) {
     if (disabled) return;
@@ -73,9 +90,15 @@ export function initTelemetry({ version, tailwind }) {
           ...extra,
         }),
         signal: AbortSignal.timeout(3000),
-      }).catch(() => {});
-    } catch {
-      /* fire and forget */
+      })
+        .then((res) => note(event, res.ok ? null : `HTTP ${res.status}`))
+        // Terminal, and it has to stay that way. If .then() were the tail of this
+        // chain a network failure would surface as an unhandled rejection, which
+        // Node turns into a dead daemon in someone else's terminal — the
+        // .catch(() => {}) this replaces was the only thing preventing that.
+        .catch((err) => note(event, err?.message || err));
+    } catch (err) {
+      note(event, err?.message || err);
     }
   }
 
@@ -92,6 +115,12 @@ export function initTelemetry({ version, tailwind }) {
     }
   }
 
-  send('boot');
-  return { firstRun, disabled, record };
+  // Not fired here. server.js calls start() once the first-run disclosure has
+  // actually printed, so a first-time user's first event never precedes the
+  // notice that tells them it's coming.
+  function start() {
+    send('boot');
+  }
+
+  return { firstRun, disabled, record, start, status: () => ({ lastSentAt, lastError }) };
 }

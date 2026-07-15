@@ -65,9 +65,15 @@ Opt out permanently:
 export CMDZERO_TELEMETRY=0   # or DO_NOT_TRACK=1 — both respected
 ```
 
+Telemetry never blocks or breaks the daemon: it's fire-and-forget with a 3s
+timeout and no retries. It's also silent about its own failures by default — set
+`CMDZERO_TELEMETRY_DEBUG=1` to log delivery errors, or read
+`curl -s localhost:4100/api/health | jq` for the last send and last error.
+
 ## Options
 
 - `npx cmdzero --port 4101` (+ `<CmdZeroOverlay origin="http://localhost:4101" />`)
 - `CMDZERO_FAST_MODEL` / `CMDZERO_SMART_MODEL` — model aliases for the router (default `haiku` / `sonnet`)
 - `CMDZERO_BASELINE_COST` / `CMDZERO_BASELINE_MS` — baseline for the savings counter
+- `CMDZERO_TELEMETRY=0` / `DO_NOT_TRACK=1` — opt out of telemetry; `CMDZERO_TELEMETRY_DEBUG=1` logs delivery failures
 - Natural-language tweaks require the [Claude Code CLI](https://claude.com/claude-code) (`claude`) on your PATH; copy/style lanes work without it.

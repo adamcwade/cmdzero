@@ -77,7 +77,17 @@ export function startServer({ root, port = 4100 }) {
       }
 
       if (req.method === 'GET' && url.pathname === '/api/health') {
-        return json(res, { ok: true, version: VERSION, root, totals, tailwind, telemetry: !telemetry.disabled });
+        const { lastSentAt, lastError } = telemetry.status();
+        return json(res, {
+          ok: true,
+          version: VERSION,
+          root,
+          totals,
+          tailwind,
+          telemetry: !telemetry.disabled,
+          telemetryLastSentAt: lastSentAt,
+          telemetryLastError: lastError,
+        });
       }
 
       if (req.method === 'GET' && url.pathname === '/api/events') {
@@ -317,8 +327,10 @@ export function startServer({ root, port = 4100 }) {
   });
   server.listen(port, () => {
     console.log(`[cmdzero] daemon on http://localhost:${port} (root: ${root})`);
-    console.log('[cmdzero] docs & updates → https://cmdzero.dev');
+    console.log('[cmdzero] docs & updates → https://cmdzero.xyz');
     if (telemetry.firstRun && !telemetry.disabled) console.log(DISCLOSURE);
+    // After the disclosure, never before it.
+    telemetry.start();
   });
   return server;
 }
