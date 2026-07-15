@@ -265,41 +265,45 @@
     try { localStorage.setItem('cz-panel-collapsed', v ? '1' : '0'); } catch { /* no storage */ }
     applyPanelLayout();
   }
-  // Opening the panel animates <body>'s margin over .26s, so the whole page
-  // slides sideways under the overlay. Everything we draw — outline, popover,
-  // move bar, hover badge — is position:fixed at coordinates measured once from
-  // getBoundingClientRect(), and that measurement runs synchronously at the
-  // START of the animation, when the page hasn't moved yet. Left alone, the
-  // boxes sit up to PANEL_W px from their element until something unrelated (a
-  // scroll, an edit) happens to re-measure.
+  // Everything the overlay draws — outline, popover, move bar, delete button,
+  // hover badge — is position:fixed at coordinates measured once from
+  // getBoundingClientRect(). The page moves under those coordinates constantly:
+  // opening the panel animates <body>'s margin for .26s, that push narrows the
+  // viewport so text re-wraps and blocks shift down, an edit changes an
+  // element's size, fonts and images land, the page runs its own animations.
+  // reposition() on scroll/resize/select catches none of that, which is why a
+  // box could sit up to PANEL_W px from its element until something unrelated
+  // happened to re-measure.
   //
-  // So re-measure across the animation. rAF is the right clock: it's gated on
-  // painting exactly like the transition, so the two stay in lockstep.
-  //
-  // Runs until the margin reaches `target` AND stops moving — deliberately not a
-  // wall-clock deadline. rAF pauses in a background tab but performance.now()
-  // doesn't, so a timed budget would burn down without ever painting a frame and
-  // leave the boxes stranded on return. Settling on the value is also refresh-rate
-  // independent. The frame cap is only a backstop for a page whose own CSS wins
-  // the margin, so the target is never reached.
-  let shiftRaf = 0;
-  function trackPanelShift(target) {
-    cancelAnimationFrame(shiftRaf);
-    let last = null;
-    let frames = 0;
+  // Chasing each cause separately is a losing game, so watch the element
+  // itself: compare its rect every frame and redraw only when it actually
+  // moved. rAF is the right clock — it's gated on painting exactly like the
+  // transitions and reflows we're chasing, so we never measure a layout the
+  // user hasn't seen yet. Idle cost is one getBoundingClientRect and a string
+  // compare per frame, and the loop only runs while the overlay has something
+  // on screen to keep glued.
+  let watchRaf = 0;
+  let lastRect = '';
+  function watchLayout() {
+    if (watchRaf) return; // already running
     const step = () => {
-      // the same trio the scroll handler runs — a scroll moves the page under
-      // these boxes for exactly the same reason a panel push does
-      reposition();
-      positionMulti();
-      setHover(state.hoverEl);
-      let now;
-      try { now = getComputedStyle(document.body).marginLeft; } catch { return; }
-      const settled = now === target && now === last;
-      last = now;
-      if (!settled && ++frames < 120) shiftRaf = requestAnimationFrame(step);
+      if (!state.selectMode && !state.selected) { watchRaf = 0; lastRect = ''; return; }
+      const target = state.selected?.el || state.hoverEl;
+      if (target && document.contains(target)) {
+        const r = target.getBoundingClientRect();
+        const key = `${r.left},${r.top},${r.width},${r.height}`;
+        if (key !== lastRect) {
+          lastRect = key;
+          // the same trio the scroll handler runs — a scroll strands these
+          // boxes for exactly the same reason any other layout shift does
+          reposition();
+          positionMulti();
+          setHover(state.hoverEl);
+        }
+      }
+      watchRaf = requestAnimationFrame(step);
     };
-    shiftRaf = requestAnimationFrame(step);
+    watchRaf = requestAnimationFrame(step);
   }
 
   // Slide the panel in/out and push the page so nothing is covered.
@@ -307,12 +311,7 @@
     const open = !!state.selected && !state.panelCollapsed;
     panel.classList.toggle('cz-collapsed', !open);
     panelTab.classList.toggle('cz-show', !!state.selected && state.panelCollapsed);
-    const next = open ? PANEL_W + 'px' : '0px';
-    // renderPanel() re-runs this on every selection; only chase the page when
-    // it's actually about to move.
-    const moves = document.body.style.marginLeft !== next;
-    try { document.body.style.marginLeft = next; } catch { /* ignore */ }
-    if (moves) trackPanelShift(next);
+    try { document.body.style.marginLeft = open ? PANEL_W + 'px' : '0px'; } catch { /* ignore */ }
   }
 
   const popLabel = el('div', 'cz-pop-label');
@@ -492,6 +491,7 @@
     renderPopover();
     renderPanel();
     reposition();
+    watchLayout(); // renderPanel() just started the panel's .26s page push
     loadMeta();
   }
 
@@ -1425,7 +1425,8 @@
   function setMode(on) {
     state.selectMode = on;
     hint.textContent = on ? 'select mode — click · shift-click multi · Tab next · ⌘Z undo · Esc exit' : '⌘0 select mode';
-    if (!on) { setHover(null); deselect(); clearMulti(); }
+    if (on) watchLayout(); // keep the boxes glued while anything on the page moves
+    else { setHover(null); deselect(); clearMulti(); }
   }
 
   // Visible, stamped elements in document order — the Tab cycle.
