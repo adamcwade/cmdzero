@@ -28,13 +28,18 @@ export function parseLoc(loc) {
 export function loadTarget(root, loc) {
   const parsed = parseLoc(loc);
   const { line, col } = parsed;
-  // Stamps come from two sources: the babel plugin (root-relative path,
-  // 0-based column) and the @cmdzero/react dev runtime (absolute path,
-  // 1-based column). Normalize the path and match either column convention.
-  const file = path.isAbsolute(parsed.file)
-    ? path.relative(root, parsed.file)
-    : parsed.file;
-  if (file.startsWith('..')) throw new Error('file outside root');
+  // Stamps come from three sources: the babel plugin (root-relative path,
+  // 0-based column) and the @cmdzero/react dev runtime (1-based column), which
+  // reports whatever the bundler handed jsxDEV — an absolute path under
+  // webpack, but "[project]/..." under Turbopack. Normalize the path and match
+  // either column convention.
+  const raw = parsed.file.replace(/^\[project\]\//, '');
+  // Resolve before the escape check: the guard has to see a normalized path,
+  // or a "foo/../../.." stamp walks straight past a leading-".." test.
+  const file = path.relative(root, path.resolve(root, raw));
+  if (file.startsWith('..') || path.isAbsolute(file)) {
+    throw new Error('file outside root');
+  }
   const abs = path.resolve(root, file);
   const content = fs.readFileSync(abs, 'utf8');
   const ast = parseSource(content, file);
