@@ -97,11 +97,31 @@
   .cz-dot.done{background:#10b981}.cz-dot.queued,.cz-dot.running{background:#f59e0b;animation:cz-pulse 1s infinite}.cz-dot.error{background:#ef4444}.cz-dot.reverted,.cz-dot.cancelled{background:#6b7280}
   .cz-tweak button{background:none;border:none;color:#818cf8;cursor:pointer;font-size:12.5px;padding:0}
   .cz-meta{color:#9ca3af}
-  .cz-hint{position:fixed;left:14px;bottom:14px;background:#111827;color:#9ca3af;font-size:12.5px;padding:6px 11px;border-radius:6px;pointer-events:none}
+  /* The hint is visible in BOTH states (out of select mode it's the ⌘0
+     affordance) — .cz-in only rides the swap between the two texts. */
+  .cz-hint{position:fixed;left:14px;bottom:14px;background:#111827;color:#9ca3af;font-size:12.5px;padding:6px 11px;border-radius:6px;pointer-events:none;opacity:0;transform:translateY(6px);transition:opacity .2s ease,transform .2s ease}
+  .cz-hint.cz-in{opacity:1;transform:translateY(0)}
   .cz-reload-toggle{position:fixed;left:14px;bottom:46px;background:#111827;color:#6ee7b7;border:1px solid #10b981;font-size:11.5px;padding:4px 9px;border-radius:6px;cursor:pointer;pointer-events:auto}
   .cz-reload-toggle.off{color:#9ca3af;border-color:#374151}
   [contenteditable="plaintext-only"],[contenteditable="true"]{outline:2px dashed #10b981;outline-offset:2px}
-  @keyframes cz-pulse{50%{opacity:.4}}`;
+  @keyframes cz-pulse{50%{opacity:.4}}
+  /* Arming select mode is otherwise a silent text swap. A one-shot sweep says
+     "we woke up"; the ring stays lit to say "we're still listening". Both are
+     opacity/transform only so they cost nothing next to watchLayout()'s polling.
+     The ring starts below the 30px banner rather than cutting across it. */
+  .cz-ring{position:fixed;top:30px;left:0;right:0;bottom:0;pointer-events:none;opacity:0;box-shadow:inset 0 0 0 2px rgba(16,185,129,.55),inset 0 0 22px rgba(16,185,129,.14);transition:opacity .18s ease}
+  .cz-ring.cz-on{opacity:1;animation:cz-breathe 3s ease-in-out infinite}
+  .cz-shine{position:fixed;inset:0;pointer-events:none;opacity:0;background:linear-gradient(105deg,transparent 40%,rgba(110,231,183,.18) 50%,transparent 60%)}
+  /* Near-linear on purpose: a fast-out curve spends most of the run parked off
+     the right edge, so the band only actually crosses the screen for a blink. */
+  .cz-shine.cz-sweep{animation:cz-sweep .55s cubic-bezier(.45,.05,.55,.95)}
+  @keyframes cz-breathe{50%{opacity:.55}}
+  @keyframes cz-sweep{0%{opacity:0;transform:translateX(-120%)}15%{opacity:1}85%{opacity:1}100%{opacity:0;transform:translateX(120%)}}
+  @media (prefers-reduced-motion:reduce){
+    .cz-ring.cz-on{animation:none}
+    .cz-shine.cz-sweep{animation:none}
+    .cz-hint{transition:none}
+  }`;
 
   const style = document.createElement('style');
   style.textContent = css;
@@ -1470,18 +1490,18 @@
       if (tries-- > 0 && Math.abs(scrollY - y) > 2) setTimeout(pin, 30);
       else { try { history.scrollRestoration = 'auto'; } catch { /* ignore */ } }
     })();
-    if (saved.selectMode) setMode(true);
+    if (saved.selectMode) setMode(true, false);
     if (saved.loc) {
       const again = document.querySelector(`[data-cz="${CSS.escape(saved.loc)}"]`);
       if (again) select(again);
     }
   }
-  if (document.readyState === 'complete') restoreAfterReload();
-  else addEventListener('load', restoreAfterReload);
 
   // ---------- mode + events ----------
-  const hint = el('div', 'cz-hint', '⌘0 select mode');
-  root.appendChild(hint);
+  const hint = el('div', 'cz-hint cz-in', '⌘0 select mode');
+  const ring = el('div', 'cz-ring');
+  const shine = el('div', 'cz-shine');
+  root.append(hint, ring, shine);
 
   const reloadToggle = el('button', 'cz-reload-toggle');
   const syncReloadToggle = () => {
@@ -1497,12 +1517,47 @@
   syncReloadToggle();
   root.appendChild(reloadToggle);
 
-  function setMode(on) {
+  // Restart the sweep even if it's mid-flight: drop the class, force a reflow,
+  // re-add it. Without the reflow the browser coalesces the two states and the
+  // animation never replays on a fast ⌘0 ⌘0 ⌘0.
+  function sweep() {
+    shine.classList.remove('cz-sweep');
+    void shine.offsetWidth;
+    shine.classList.add('cz-sweep');
+  }
+  shine.addEventListener('animationend', () => shine.classList.remove('cz-sweep'));
+
+  // Let the pill drop out before the words change, so the swap reads as one
+  // motion rather than a jump cut. Compare against the text we're heading for,
+  // not the one on screen: mid-swap those differ, and a fast ⌘0 ⌘0 would
+  // otherwise take the early return and leave the pill showing the wrong mode.
+  let hintTimer = null;
+  let hintText = hint.textContent;
+  function setHintText(text) {
+    if (hintText === text) return;
+    hintText = text;
+    clearTimeout(hintTimer);
+    hint.classList.remove('cz-in');
+    hintTimer = setTimeout(() => { hint.textContent = hintText; hint.classList.add('cz-in'); }, 140);
+  }
+
+  // `announce` plays the activation sweep. It's on for a real ⌘0 press and off
+  // when we're only restoring the mode after an auto-reload — the sweep should
+  // read as "you just armed this", not fire again on every write.
+  function setMode(on, announce = true) {
     state.selectMode = on;
-    hint.textContent = on ? 'select mode — click · shift-click multi · Tab next · ⌘Z undo · Esc exit' : '⌘0 select mode';
+    setHintText(on ? 'select mode — click · shift-click multi · Tab next · ⌘Z undo · Esc exit' : '⌘0 select mode');
+    ring.classList.toggle('cz-on', on);
+    if (on && announce) sweep();
     if (on) watchLayout(); // keep the boxes glued while anything on the page moves
     else { setHover(null); deselect(); clearMulti(); }
   }
+
+  // Run the restore only now: it calls setMode(), which touches the hint/ring/
+  // shine consts declared above. On a document that's already `complete` when
+  // the overlay is injected it would otherwise run during the temporal dead zone.
+  if (document.readyState === 'complete') restoreAfterReload();
+  else addEventListener('load', restoreAfterReload);
 
   // Visible, stamped elements in document order — the Tab cycle.
   function stampedEls() {
